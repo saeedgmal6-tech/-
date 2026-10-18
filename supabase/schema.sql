@@ -44,3 +44,7 @@ with check (
 -- and writes behind a server/Edge Function that validates the random slug, add
 -- rate limiting/CAPTCHA, and use private object storage for uploaded media.
 -- The anon key is public by design; never put a service-role key in VITE_* variables.
+
+-- Keep the theme constraint up to date when this script is rerun on an existing project.
+alter table public.gifts drop constraint if exists gifts_theme_check;
+alter table public.gifts add constraint gifts_theme_check check (theme in ('rose','night','cream','garden','sunset','lavender','ocean','midnight'));
