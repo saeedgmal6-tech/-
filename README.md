@@ -63,3 +63,17 @@ VITE_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY
 - `src/styles.css` تصميم متجاوب.
 - `supabase/schema.sql` جداول وسياسات قاعدة البيانات.
 - `.env.example` مثال متغيرات البيئة.
+
+
+## ميزات إضافية
+- 8 ثيمات لونية للمناسبات المختلفة.
+- مناسبات إضافية: خطوبة، زواج، اشتياق، صداقة، وعيد الأم.
+- مساعد اقتراحات رسائل قابل للتعديل (قوالب جاهزة، وليس توليدًا عبر نموذج ذكاء اصطناعي).
+- إمكانية حفظ نص الهدية كملف TXT.
+- راجع ملاحظات الأمان في `supabase/schema.sql` قبل الاستخدام التجاري.
+
+## متغيرات البيئة في Vercel
+أضف:
+- `VITE_SUPABASE_URL`: رابط مشروع Supabase.
+- `VITE_SUPABASE_ANON_KEY`: المفتاح العام (anon/publishable) فقط.
+بعد تشغيل SQL في Supabase، أعد نشر المشروع من Vercel.
