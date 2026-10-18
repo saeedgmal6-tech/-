@@ -11,7 +11,7 @@ create table if not exists public.gifts (
   message text not null,
   date date,
   occasion text not null default 'مجرد إني بحبك',
-  theme text not null default 'rose' check (theme in ('rose','night','cream','garden')),
+  theme text not null default 'rose' check (theme in ('rose','night','cream','garden','sunset','lavender','ocean','midnight')),
   photos jsonb not null default '[]'::jsonb,
   cover text,
   music boolean not null default false,
@@ -38,7 +38,9 @@ with check (
   and length(slug) between 6 and 40
 );
 
--- NOTE: For production privacy, add user authentication and owner_id,
--- then replace public read/insert policies with owner-aware policies.
--- The anonymous insert policy means anyone can create a gift; add rate limiting
--- or CAPTCHA before opening this publicly to prevent spam.
+-- SECURITY NOTE:
+-- This starter public SELECT policy permits anonymous queries of gift rows.
+-- Do not store highly sensitive information. Before commercial launch, move reads
+-- and writes behind a server/Edge Function that validates the random slug, add
+-- rate limiting/CAPTCHA, and use private object storage for uploaded media.
+-- The anon key is public by design; never put a service-role key in VITE_* variables.
