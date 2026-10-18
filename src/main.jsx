@@ -18,8 +18,12 @@ const themes = [
   { id: "night", name: "ليلة تحت النجوم", emoji: "🌙", bg: "linear-gradient(145deg,#191c3c,#37345f)", accent: "#e9c7ff" },
   { id: "cream", name: "دفء وحنين", emoji: "🤍", bg: "linear-gradient(145deg,#fff8e9,#f5e7d1)", accent: "#95663f" },
   { id: "garden", name: "حديقة حب", emoji: "🌿", bg: "linear-gradient(145deg,#edf6e9,#d5e7d0)", accent: "#487b52" },
+  { id: "sunset", name: "غروب دافئ", emoji: "🌅", bg: "linear-gradient(145deg,#fff0df,#f8c6b8)", accent: "#a94f42" },
+  { id: "lavender", name: "لافندر هادئ", emoji: "🪻", bg: "linear-gradient(145deg,#f4edff,#ded2f7)", accent: "#7655a5" },
+  { id: "ocean", name: "نسمة بحر", emoji: "🌊", bg: "linear-gradient(145deg,#e4f7fb,#c5e6ef)", accent: "#276c83" },
+  { id: "midnight", name: "منتصف الليل", emoji: "✨", bg: "linear-gradient(145deg,#171827,#343653)", accent: "#f2d6a2" },
 ];
-const occasions = ["بدون مناسبة", "عيد ميلاد", "ذكرى سنوية", "عيد الحب", "اعتذار من القلب", "مجرد إني بحبك"];
+const occasions = ["بدون مناسبة", "عيد ميلاد", "ذكرى سنوية", "عيد الحب", "خطوبة", "زواج", "اعتذار من القلب", "اشتياق", "صداقة", "عيد الأم", "مجرد إني بحبك"];
 const localKey = "lahzetna_gifts_v1";
 
 function readLocal() {
@@ -304,6 +308,14 @@ function How({ startCreate }) {
 
 function CreatePage({ form, setField, themes, theme, handlePhoto, createGift, saving }) {
   const [preview, setPreview] = useState(false);
+  const [messageStyle, setMessageStyle] = useState("romantic");
+  const messageIdeas = {
+    romantic: "يا " + (form.toName || "أجمل شخص") + "، وجودك في حياتي بيخلّي أبسط الأيام مختلفة. كل ذكرى معاك غالية، ونفسي نفضل نخلق لحظات جديدة نفتكرها طول العمر. بحبك أكتر من الكلام ❤️",
+    apology: "يمكن الكلام مش كفاية، بس حابب أقولك إنك غالي عندي وإن زعلك بيفرق معايا. أتمنى نقدر نتكلم ونفهم بعض، لأن وجودك في حياتي يستاهل إني أحاول من قلبي. 🤍",
+    friendship: "في ناس وجودها بيخلّي الدنيا أهون وأجمل، وإنت من الناس دي. شكرًا على كل موقف حلو وكل ضحكة وكل ذكرى. أتمنى تفضل أيامنا مليانة حاجات حلوة سوا 💛",
+    birthday: "كل سنة وإنت طيب يا أجمل هدية في الدنيا! أتمنى سنتك الجديدة تكون مليانة راحة وفرح ونجاحات، وتحقق فيها كل اللي نفسك فيه. وجودك لوحده سبب للفرحة 🎂"
+  };
+  const applyMessageIdea = () => setField("message", messageIdeas[messageStyle]);
   return <main className="create-page section-wrap">
     <div className="page-intro compact"><span className="eyebrow"><WandSparkles size={15}/> تفاصيل من اختيارك</span><h1>اصنع <span>هديتك الخاصة</span></h1><p>خد وقتك، كل تفصيلة صغيرة بتخلي الهدية شبهكم أكتر.</p></div>
     <div className="builder-layout">
@@ -317,6 +329,15 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, createGift, sa
         </div>
         <div className="form-section">
           <div className="form-section-title"><span className="form-icon"><MessageCircle size={19}/></span><div><h2>رسالتك من القلب</h2><p>اكتب الكلام اللي نفسك الشخص ده يسمعه منك.</p></div></div>
+          <div className="message-assistant">
+            <div className="message-assistant-head"><WandSparkles size={17}/><strong>ساعدني أبدأ الرسالة</strong><small>اقتراحات جاهزة تقدر تعدلها بكلامك</small></div>
+            <div className="message-idea-controls">
+              <select aria-label="نوع الرسالة" value={messageStyle} onChange={e=>setMessageStyle(e.target.value)}>
+                <option value="romantic">رومانسية</option><option value="apology">اعتذار</option><option value="friendship">صداقة وامتنان</option><option value="birthday">عيد ميلاد</option>
+              </select>
+              <button type="button" className="btn btn-outline" onClick={applyMessageIdea}>استخدم الاقتراح</button>
+            </div>
+          </div>
           <label>الرسالة<textarea value={form.message} onChange={e=>setField("message",e.target.value)} rows={6} maxLength={1800} required placeholder="اكتب رسالتك هنا..."/></label>
           <div className="textarea-foot"><span>خليها بكلامك، ده اللي بيفرق ❤️</span><span>{form.message.length}/1800</span></div>
         </div>
@@ -374,6 +395,13 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
   if (loading) return <main className="view-page section-wrap"><div className="loader"></div><p>بنفتح هديتك...</p></main>;
   if (!gift) return <main className="not-found section-wrap"><span className="not-found-icon">♡</span><h1>الهدية دي مش موجودة</h1><p>ممكن الرابط غلط، أو الهدية محفوظة على جهاز تاني ولسه قاعدة البيانات مش متفعّلة.</p><button className="btn btn-primary" onClick={goHome}>ارجع للرئيسية</button></main>;
   const photos = Array.isArray(gift.photos) ? gift.photos : [];
+  const downloadGift = () => {
+    const text = (gift.title || "هدية من لحظتنا") + "\n\nإلى: " + (gift.to_name || "") + "\nمن: " + (gift.from_name || "") + "\nالمناسبة: " + (gift.occasion || "") + "\n\n" + (gift.message || "") + "\n\n" + (gift.date ? "التاريخ: " + fmtDate(gift.date) + "\n" : "") + "صُنعت بحب من لحظتنا";
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "lahzetna-gift.txt"; a.click();
+    URL.revokeObjectURL(url);
+  };
   return <main className="view-page section-wrap">
     <div className="view-top"><button className="text-link" onClick={goHome}><ChevronRight size={17}/> الرئيسية</button><span><Heart size={14} fill="currentColor"/> لحظتنا</span></div>
     <article className={`full-gift full-${gift.theme||"rose"}`} style={{background:theme.bg,"--gift-accent":theme.accent}}>
@@ -391,7 +419,7 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
         <div className="full-signature">اتعملت بكل حب <Heart size={14} fill="currentColor"/></div>
       </div>
     </article>
-    <div className="view-bottom"><p>كل لحظة حلوة تستاهل تتفتكر.</p><button className="btn btn-primary" onClick={startCreate}>اصنع هدية زي دي <ArrowLeft size={17}/></button></div>
+    <div className="view-bottom"><p>كل لحظة حلوة تستاهل تتفتكر.</p><div className="view-bottom-actions"><button className="btn btn-outline" onClick={downloadGift}><Upload size={16}/> احفظ الرسالة كملف</button><button className="btn btn-primary" onClick={startCreate}>اصنع هدية زي دي <ArrowLeft size={17}/></button></div></div>
   </main>;
 }
 
