@@ -30,3 +30,8 @@ alter table public.site_events enable row level security;
 
 -- Intentionally do not add anon/authenticated policies. These tables are accessed only
 -- by trusted serverless functions using SUPABASE_SERVICE_ROLE_KEY.
+
+-- Move public gift reads and inserts behind the server API so it can enforce scheduled
+-- reveal/expiry rules and prevent payment bypass. Server functions use service_role.
+drop policy if exists "Public can read gifts by link" on public.gifts;
+drop policy if exists "Public can create gifts" on public.gifts;
