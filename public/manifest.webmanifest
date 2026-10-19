@@ -1,0 +1,20 @@
+{
+  "name": "لحظتنا - هدية من القلب",
+  "short_name": "لحظتنا",
+  "description": "اصنع هدية رقمية شخصية تحكي حكايتكم",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fff8f6",
+  "theme_color": "#fff8f6",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
