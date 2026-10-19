@@ -324,6 +324,35 @@ function App() {
     window.history.pushState({}, "", "/");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+  function copyGiftForEditing(gift) {
+    setForm({
+      title: gift.title || "حكايتنا لسه مكملة",
+      fromName: gift.from_name || "",
+      toName: gift.to_name || "",
+      message: gift.message || "",
+      date: gift.date || "",
+      occasion: gift.occasion || "مجرد إني بحبك",
+      theme: gift.theme || "rose",
+      photos: (gift.photos || []).slice(0, 5).map((photo, i) => ({ name: `photo-${i + 1}.jpg`, data: typeof photo === "string" ? photo : photo.data })),
+      cover: gift.cover || "",
+      music: !!gift.music,
+      audioUrl: gift.audio_url || "",
+      audioName: gift.audio_name || "",
+      videoUrl: gift.video_url || "",
+      expiresAt: gift.expires_at || "",
+      password: "",
+      customAccent: gift.custom_accent || "",
+      fontFamily: gift.font_family || "Cairo",
+      payerPhone: "",
+      transferReference: ""
+    });
+    setActiveGift(null);
+    setPage("create");
+    window.history.pushState({}, "", "/");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setToast("جهزت نسخة قابلة للتعديل. هتحتاج تسجل طلب دفع جديد لنشر النسخة.");
+  }
+
   function goHome() {
     setPage("home");
     setActiveGift(null);
@@ -360,7 +389,7 @@ function App() {
       {page === "view" && <GiftView gift={activeGift} theme={giftTheme} loading={giftLoading} goHome={goHome} startCreate={startCreate} />}
       {page === "payment-return" && <PaymentReturn goHome={goHome} />}
       {page === "manual-payment" && <ManualPaymentPage pendingPayment={pendingPayment} goHome={goHome} />}
-      {page === "mygifts" && <MyGifts gifts={gifts} openGift={openGift} startCreate={startCreate} setGifts={setGifts} setToast={setToast} />}
+      {page === "mygifts" && <MyGifts gifts={gifts} openGift={openGift} startCreate={startCreate} setGifts={setGifts} setToast={setToast} copyGiftForEditing={copyGiftForEditing} />}
       <footer className="footer">
         <div className="footer-inner">
           <button className="brand footer-brand" onClick={goHome}><span className="brand-mark"><Heart size={20} fill="currentColor"/></span><span className="brand-text"><strong>لحظتنا</strong><small>LAHZETNA</small></span></button>
@@ -732,7 +761,29 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
   </main>;
 }
 
-function MyGifts({ gifts, openGift, startCreate, setGifts, setToast }) {
+function MyGifts({ gifts, openGift, startCreate, setGifts, setToast, copyGiftForEditing }) {
+  const [giftUrlInput, setGiftUrlInput] = useState("");
+  const [importing, setImporting] = useState(false);
+  async function importGift(event) {
+    event.preventDefault();
+    const value = giftUrlInput.trim();
+    const match = value.match(/(?:\/g\/)?([a-z0-9]{6,40})\/?(?:\?.*)?$/i);
+    const id = match?.[1];
+    if (!id) { setToast("الصق رابط هدية صحيح من لحظتنا."); return; }
+    setImporting(true);
+    try {
+      let found = readLocal().find(item => item.slug === id) || null;
+      if (supabase) {
+        const { data, error } = await supabase.from("gifts").select("*").eq("slug", id).maybeSingle();
+        if (!error && data) found = decodeGiftRecord(data);
+      }
+      if (!found) throw new Error("مش لاقي الهدية. اتأكد إن الرابط صحيح وإن الهدية اتنشرت.");
+      setGifts(prev => [found, ...prev.filter(item => item.slug !== found.slug)]);
+      setGiftUrlInput("");
+      setToast("اتضافت الهدية لقائمة هداياي على الجهاز ده.");
+    } catch (error) { setToast(error.message || "تعذر استرجاع الهدية."); }
+    finally { setImporting(false); }
+  }
   function removeGift(gift) {
     if (!window.confirm("متأكد إنك عايز تحذف الهدية دي من الجهاز؟")) return;
     setGifts(prev=>prev.filter(g=>g.slug!==gift.slug));
@@ -741,8 +792,9 @@ function MyGifts({ gifts, openGift, startCreate, setGifts, setToast }) {
   }
   return <main className="inner-page section-wrap mygifts-page">
     <div className="page-intro"><span className="eyebrow"><Heart size={15}/> ذكرياتك</span><h1>هدايا <span>لحظتنا</span></h1><p>كل هدية عملتها هتلاقيها هنا على الجهاز ده.</p></div>
+    <form className="gift-import-form" onSubmit={importGift}><label>استرجع هدية من رابطها<input value={giftUrlInput} onChange={e=>setGiftUrlInput(e.target.value)} placeholder="الصق رابط الهدية هنا" dir="ltr"/></label><button className="btn btn-outline" type="submit" disabled={importing}>{importing?"جاري الاسترجاع...":"إضافة لهداياي"}</button><small>مفيد لو فتحت الموقع من جهاز جديد؛ لازم يكون معاك رابط الهدية.</small></form>
     {gifts.length===0 ? <div className="empty-state"><span className="empty-heart"><Gift size={34}/></span><h2>لسه مفيش هدايا</h2><p>أول هدية ممكن تكون بداية ذكرى جميلة.</p><button className="btn btn-primary" onClick={startCreate}>اصنع أول هدية <ArrowLeft size={17}/></button></div> :
-      <div className="gifts-grid">{gifts.map(g=><div className="gift-list-card" key={g.slug}><button className={`gift-list-cover cover-${g.theme||"rose"}`} onClick={()=>openGift(g)}>{g.cover?<img src={g.cover} alt=""/>:<Heart size={40} fill="currentColor"/>}<span>{(themes.find(t=>t.id===g.theme)||themes[0]).emoji}</span></button><div className="gift-list-body"><small>إلى {g.to_name}</small><h3>{g.title||`هدية إلى ${g.to_name}`}</h3><p>{g.message?.slice(0,90)}{(g.message||"").length>90?"…":""}</p><div className="gift-list-actions"><button onClick={()=>openGift(g)}><Eye size={15}/> عرض</button><button onClick={()=>{navigator.clipboard?.writeText(`${window.location.origin}/g/${g.slug}`).then(()=>setToast("تم نسخ الرابط")).catch(()=>window.prompt("انسخ الرابط",`${window.location.origin}/g/${g.slug}`));}}><Copy size={15}/> نسخ الرابط</button><button className="delete-action" onClick={()=>removeGift(g)} aria-label="حذف"><Trash2 size={15}/></button></div></div></div>)}</div>}
+      <div className="gifts-grid">{gifts.map(g=><div className="gift-list-card" key={g.slug}><button className={`gift-list-cover cover-${g.theme||"rose"}`} onClick={()=>openGift(g)}>{g.cover?<img src={g.cover} alt=""/>:<Heart size={40} fill="currentColor"/>}<span>{(themes.find(t=>t.id===g.theme)||themes[0]).emoji}</span></button><div className="gift-list-body"><small>إلى {g.to_name}</small><h3>{g.title||`هدية إلى ${g.to_name}`}</h3><p>{g.message?.slice(0,90)}{(g.message||"").length>90?"…":""}</p><div className="gift-list-actions"><button onClick={()=>openGift(g)}><Eye size={15}/> عرض</button><button onClick={()=>copyGiftForEditing(g)}><WandSparkles size={15}/> تعديل كنسخة</button><button onClick={()=>{navigator.clipboard?.writeText(`${window.location.origin}/g/${g.slug}`).then(()=>setToast("تم نسخ الرابط")).catch(()=>window.prompt("انسخ الرابط",`${window.location.origin}/g/${g.slug}`));}}><Copy size={15}/> نسخ الرابط</button><button className="delete-action" onClick={()=>removeGift(g)} aria-label="حذف"><Trash2 size={15}/></button></div></div></div>)}</div>}
   </main>;
 }
 
