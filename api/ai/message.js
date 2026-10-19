@@ -9,7 +9,6 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: "مساعد الرسائل محتاج مفتاح OPENAI_API_KEY في إعدادات Vercel. باقي الموقع يشتغل عادي من غيره." });
   let body;
   try { body = typeof req.body === "string" ? JSON.parse(req.body) : req.body; }
   catch { return res.status(400).json({ error: "بيانات الرسالة غير صالحة." }); }
@@ -18,6 +17,15 @@ export default async function handler(req, res) {
   const occasion = String(body?.occasion || "بدون مناسبة").trim().slice(0, 80);
   const style = styleNames[body?.style] || styleNames.romantic;
   const currentMessage = String(body?.currentMessage || "").trim().slice(0, 1800);
+  if (!apiKey) {
+    const fallback = {
+      romantic: `يا ${toName}، يمكن الكلام مهما طال مش هيعرف يوصف مكانتك عندي. وجودك بيخلّي الأيام العادية أحلى، وكل ذكرى بينا بتفضل قريبة من قلبي. ${occasion !== "بدون مناسبة" ? "وفي " + occasion + "، " : ""}أتمنى أفضل سبب في ابتسامتك زي ما إنت سبب في حاجات كتير حلوة جوايا. ❤️`,
+      apology: `يا ${toName}، أنا عارف إن الكلام لوحده مش كفاية، بس حابب أقولك إن مشاعرك مهمة عندي وإن زعلك مش حاجة أعدّيها كأنها عادية. أتمنى تديني فرصة أسمعك وأفهمك وأصلّح اللي أقدر عليه، من غير ما أضغط عليك. 🤍`,
+      friendship: `يا ${toName}، وجودك في حياتي من الحاجات اللي بقدّرها بجد. شكرًا على كل مرة كنت فيها سند، وعلى الضحكة والكلام والذكريات اللي بتخلّي الدنيا أخف. أتمنى تفضل بينا المودة دي وتزيد مع الأيام. 💛`,
+      birthday: `كل سنة وإنت طيب يا ${toName}! أتمنى سنتك الجديدة تكون أهدى على قلبك، وأوسع لأحلامك، ومليانة لحظات تستاهل تفتكرها وتبتسم. تستاهل كل خير وفرحة، ويارب اللي جاي يكون أجمل مما تتمنى. 🎂`
+    };
+    return res.status(200).json({ message: fallback[body?.style] || fallback.romantic, fallback: true, notice: "اتضاف اقتراح جاهز مخصص. لتفعيل الكتابة بالذكاء الاصطناعي فعليًا، أضف OPENAI_API_KEY في Vercel." });
+  }
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
