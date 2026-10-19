@@ -24,9 +24,16 @@ export default async function handler(req, res) {
       const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
       const { data } = await db.from("gifts").select("title,from_name,to_name,message,cover,photos").eq("slug", slug).maybeSingle();
       if (data) {
-        title = data.title || ("هدية إلى " + (data.to_name || "شخص مميز"));
-        description = "هدية مخصوصة من " + (data.from_name || "شخص بيحبك") + " إلى " + (data.to_name || "شخص مميز") + " ❤️";
-        if (typeof data.cover === "string" && data.cover.startsWith("https://")) imageUrl = data.cover;
+        const photos = Array.isArray(data.photos) ? data.photos : [];
+        const metaItem = photos.find(item => item && typeof item === "object" && item.__lahzetna_meta);
+        const meta = metaItem?.__lahzetna_meta || {};
+        const expired = meta.expires_at && new Date(meta.expires_at + "T23:59:59").getTime() < Date.now();
+        const scheduled = meta.open_at && Date.parse(meta.open_at) > Date.now();
+        if (!expired && !scheduled) {
+          title = data.title || ("هدية إلى " + (data.to_name || "شخص مميز"));
+          description = "هدية مخصوصة من " + (data.from_name || "شخص بيحبك") + " إلى " + (data.to_name || "شخص مميز") + " ❤️";
+          if (typeof data.cover === "string" && data.cover.startsWith("https://")) imageUrl = data.cover;
+        }
       }
     } catch (error) { console.error("Gift preview metadata lookup failed:", error?.message || error); }
   }
