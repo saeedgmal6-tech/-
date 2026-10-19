@@ -81,7 +81,7 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "حكايتنا لسه مكملة", fromName: "", toName: "", message: "في وسط كل الأيام العادية، إنت أجمل حاجة حصلتلي. كل لحظة معاك بتستاهل تتحكي، وكل ذكرى بينا ليها مكان خاص في قلبي. ❤️",
-    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, audioUrl: "", audioName: "", videoUrl: "", expiresAt: "", openAt: "", password: "", customAccent: "", fontFamily: "Cairo", payerPhone: "", transferReference: ""
+    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, audioUrl: "", audioName: "", videoUrl: "", expiresAt: "", openAt: "", timeline: [], password: "", customAccent: "", fontFamily: "Cairo", payerPhone: "", transferReference: ""
   });
   const [giftLoading, setGiftLoading] = useState(false);
 
@@ -252,7 +252,7 @@ function App() {
     }
     if (form.password && form.password.length < 4) { setToast("كلمة مرور الهدية لازم تكون 4 أحرف على الأقل."); return; }
     setSaving(true);
-    const privatePayload = { message: form.message.trim(), photos: form.photos.map(p => p.data), cover: form.cover || form.photos[0]?.data || "", audio_url: form.audioUrl || "", audio_name: form.audioName || "", video_url: form.videoUrl || "" };
+    const privatePayload = { message: form.message.trim(), photos: form.photos.map(p => p.data), cover: form.cover || form.photos[0]?.data || "", audio_url: form.audioUrl || "", audio_name: form.audioName || "", video_url: form.videoUrl || "", timeline: Array.isArray(form.timeline) ? form.timeline.slice(0, 6) : [] };
     let securePayload = null;
     try { if (form.password) securePayload = await encryptGiftPayload(privatePayload, form.password); }
     catch { setSaving(false); setToast("تعذر تشفير محتوى الهدية على هذا المتصفح."); return; }
@@ -273,6 +273,7 @@ function App() {
       video_url: form.password ? "" : (form.videoUrl || ""),
       expires_at: form.expiresAt || null,
       open_at: form.openAt || null,
+      timeline: form.password ? [] : (Array.isArray(form.timeline) ? form.timeline.slice(0, 6) : []),
       custom_accent: form.customAccent || "",
       font_family: form.fontFamily || "Cairo",
       locked: !!form.password,
@@ -342,6 +343,7 @@ function App() {
       videoUrl: gift.video_url || "",
       expiresAt: gift.expires_at || "",
       openAt: gift.open_at || "",
+      timeline: Array.isArray(gift.timeline) ? gift.timeline : [],
       password: "",
       customAccent: gift.custom_accent || "",
       fontFamily: gift.font_family || "Cairo",
@@ -515,6 +517,10 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpl
     encouragement: "أنا مؤمن بيك وبكل خطوة بتاخدها، حتى لو الطريق طويل. خدها يوم بيوم، وافتكر إنك أقوى مما تتخيل وإنك تستاهل كل خير ✨"
   };
   const applyMessageIdea = () => setField("message", messageIdeas[messageStyle]);
+  const timeline = Array.isArray(form.timeline) ? form.timeline : [];
+  const updateTimeline = (index, key, value) => setField("timeline", timeline.map((item, i) => i === index ? { ...item, [key]: value } : item));
+  const addTimeline = () => { if (timeline.length >= 6) return; setField("timeline", [...timeline, { title: "", date: "", description: "" }]); };
+  const removeTimeline = index => setField("timeline", timeline.filter((_, i) => i !== index));
   return <main className="create-page section-wrap">
     <div className="page-intro compact"><span className="eyebrow"><WandSparkles size={15}/> تفاصيل من اختيارك</span><h1>اصنع <span>هديتك الخاصة</span></h1><p>خد وقتك، كل تفصيلة صغيرة بتخلي الهدية شبهكم أكتر.</p></div>
     <div className="builder-layout">
@@ -542,6 +548,19 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpl
           </div>
           <label>الرسالة<textarea value={form.message} onChange={e=>setField("message",e.target.value)} rows={6} maxLength={1800} required placeholder="اكتب رسالتك هنا..."/></label>
           <div className="textarea-foot"><span>خليها بكلامك، ده اللي بيفرق ❤️</span><span>{form.message.length}/1800</span></div>
+        </div>
+        <div className="form-section">
+          <div className="form-section-title"><span className="form-icon"><CalendarDays size={19}/></span><div><h2>خط زمني لذكرياتكم</h2><p>رتّبوا لحد 6 لحظات مهمة في حكايتكم.</p></div></div>
+          {!timeline.length && <p className="optional">مثلاً: أول مقابلة، أول سفرية، أو يوم مميز مش هتنسوه.</p>}
+          <div className="timeline-editor">
+            {timeline.map((item, index) => <div className="timeline-edit-card" key={index}>
+              <div className="timeline-edit-head"><strong>الذكرى {index + 1}</strong><button type="button" className="text-link" onClick={() => removeTimeline(index)}><Trash2 size={14}/> حذف</button></div>
+              <label>عنوان الذكرى<input value={item.title || ""} onChange={e => updateTimeline(index, "title", e.target.value)} placeholder="أول مرة اتقابلنا" maxLength={80}/></label>
+              <label>التاريخ (اختياري)<input type="date" value={item.date || ""} onChange={e => updateTimeline(index, "date", e.target.value)}/></label>
+              <label>تفاصيل صغيرة<textarea value={item.description || ""} onChange={e => updateTimeline(index, "description", e.target.value)} placeholder="إيه اللي خلّى اليوم ده مميز؟" rows={2} maxLength={400}/></label>
+            </div>)}
+          </div>
+          <button type="button" className="btn btn-outline" onClick={addTimeline} disabled={timeline.length >= 6}><Plus size={16}/> إضافة ذكرى {timeline.length ? "(" + timeline.length + "/6)" : ""}</button>
         </div>
         <div className="form-section">
           <div className="form-section-title"><span className="form-icon"><Camera size={19}/></span><div><h2>صور بتحكي</h2><p>ضيف لحد 5 صور من الذكريات اللي بتحبوها.</p></div></div>
@@ -764,6 +783,7 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
         <div className="full-names"><span>{visibleGift.from_name}</span><Heart size={18} fill="currentColor"/><span>{visibleGift.to_name}</span></div>
         {(visibleGift.cover || photos.length>0) && <img className="full-cover" src={visibleGift.cover || (typeof photos[0]==="string" ? photos[0] : photos[0]?.data)} alt="ذكرى خاصة"/>}
         <div className="full-message">{visibleGift.message}</div>
+        {Array.isArray(visibleGift.timeline) && visibleGift.timeline.length > 0 && <section className="gift-timeline"><span className="eyebrow"><CalendarDays size={14}/> حكايتكم بالترتيب</span><div className="gift-timeline-list">{visibleGift.timeline.filter(item => item && (item.title || item.description)).map((item, index) => <article className="gift-timeline-item" key={index}><span className="gift-timeline-dot">{index + 1}</span><div><h3>{item.title || "ذكرى جميلة"}</h3>{item.date && <time>{fmtDate(item.date)}</time>}{item.description && <p>{item.description}</p>}</div></article>)}</div></section>}
         {visibleGift.date && <div className="full-date"><CalendarDays size={16}/>{fmtDate(visibleGift.date)}</div>}
         {photos.length > 1 && <div className="full-gallery">{photos.slice(0,5).map((p,i)=><img key={i} src={typeof p==="string"?p:p.data} alt={`ذكرى ${i+1}`}/>)}</div>}
         {visibleGift.audio_url && <section className="gift-audio-panel"><h3><Music2 size={18}/> {visibleGift.audio_name || "رسالة صوتية أو أغنية"}</h3><p>اسمع الرسالة على راحتك ❤️</p><audio controls preload="metadata" src={visibleGift.audio_url}>المتصفح لا يدعم تشغيل الصوت.</audio></section>}
