@@ -30,6 +30,42 @@ function readLocal() {
   try { return JSON.parse(localStorage.getItem(localKey) || "[]"); } catch { return []; }
 }
 function saveLocal(items) { localStorage.setItem(localKey, JSON.stringify(items)); }
+function decodeGiftRecord(gift) {
+  if (!gift || typeof gift !== "object") return gift;
+  const storedPhotos = Array.isArray(gift.photos) ? gift.photos : [];
+  const metadataEntry = storedPhotos.find(item => item && typeof item === "object" && item.__lahzetna_meta);
+  const meta = metadataEntry?.__lahzetna_meta || {};
+  return {
+    ...gift,
+    ...meta,
+    photos: storedPhotos.filter(item => typeof item === "string" || (item && typeof item === "object" && item.data && !item.__lahzetna_meta))
+  };
+}
+function bytesToBase64(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+function base64ToBytes(value) {
+  return Uint8Array.from(atob(value), char => char.charCodeAt(0));
+}
+async function encryptGiftPayload(payload, password) {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const material = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 250000, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(JSON.stringify(payload)));
+  return { version: 1, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(encrypted)) };
+}
+async function decryptGiftPayload(encrypted, password) {
+  if (!encrypted || encrypted.version !== 1) throw new Error("بيانات الحماية غير صالحة.");
+  const encoder = new TextEncoder();
+  const material = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: base64ToBytes(encrypted.salt), iterations: 250000, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(encrypted.iv) }, key, base64ToBytes(encrypted.ciphertext));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
 function slug() { return Math.random().toString(36).slice(2, 7) + Date.now().toString(36).slice(-5); }
 function fmtDate(value) {
   if (!value) return "";
@@ -45,7 +81,7 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "حكايتنا لسه مكملة", fromName: "", toName: "", message: "في وسط كل الأيام العادية، إنت أجمل حاجة حصلتلي. كل لحظة معاك بتستاهل تتحكي، وكل ذكرى بينا ليها مكان خاص في قلبي. ❤️",
-    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, payerPhone: "", transferReference: ""
+    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, audioUrl: "", audioName: "", videoUrl: "", expiresAt: "", password: "", customAccent: "", fontFamily: "Cairo", payerPhone: "", transferReference: ""
   });
   const [giftLoading, setGiftLoading] = useState(false);
 
@@ -99,8 +135,9 @@ function App() {
         if (stopped) return;
         if (response.ok && result.status === "paid" && result.gift) {
           stopped = true;
-          setActiveGift(result.gift);
-          setGifts(prev => [result.gift, ...prev.filter(g => g.slug !== result.gift.slug)]);
+          const publishedGift = decodeGiftRecord(result.gift);
+          setActiveGift(publishedGift);
+          setGifts(prev => [publishedGift, ...prev.filter(g => g.slug !== publishedGift.slug)]);
           window.history.replaceState({}, "", `/g/${result.gift.slug}`);
           setPage("success");
           return;
@@ -130,9 +167,9 @@ function App() {
     let found = null;
     if (supabase) {
       const { data, error } = await supabase.from("gifts").select("*").eq("slug", id).maybeSingle();
-      if (!error && data) found = data;
+      if (!error && data) found = decodeGiftRecord(data);
     }
-    if (!found) found = readLocal().find(g => g.slug === id) || null;
+    if (!found) found = decodeGiftRecord(readLocal().find(g => g.slug === id) || null);
     setActiveGift(found);
     setPage("view");
     setGiftLoading(false);
@@ -174,6 +211,31 @@ function App() {
     event.target.value = "";
   }
 
+  async function handleMediaUpload(event, field) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const isAudio = field === "audioUrl";
+    const allowed = isAudio ? file.type.startsWith("audio/") : file.type.startsWith("video/");
+    const maxSize = isAudio ? 25 * 1024 * 1024 : 35 * 1024 * 1024;
+    if (!allowed) { setToast(isAudio ? "اختار ملف صوتي MP3 أو M4A أو WAV أو OGG." : "اختار ملف فيديو صالح."); return; }
+    if (file.size > maxSize) { setToast(`حجم الملف أكبر من الحد المسموح (${isAudio ? "25" : "35"} ميجابايت).`); return; }
+    if (!supabase) { setToast("رفع الملفات يحتاج اتصال قاعدة بيانات Supabase. جرّب تحديث الصفحة."); return; }
+    setSaving(true);
+    try {
+      const signResponse = await fetch("/api/media/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size, mediaType: isAudio ? "audio" : "video" }) });
+      const signed = await signResponse.json().catch(() => ({}));
+      if (!signResponse.ok || !signed.path || !signed.token) throw new Error(signed.error || "تعذر تجهيز رفع الملف.");
+      const { error } = await supabase.storage.from("lahzetna-media").uploadToSignedUrl(signed.path, signed.token, file, { contentType: file.type, upsert: true });
+      if (error) throw error;
+      setField(field, signed.publicUrl);
+      if (isAudio) setField("audioName", file.name);
+      setToast(isAudio ? "تم رفع الصوت بنجاح" : "تم رفع الفيديو بنجاح");
+    } catch (error) {
+      setToast(error.message || "فشل رفع الملف. حاول بملف أصغر.");
+    } finally { setSaving(false); }
+  }
+
   async function createGift(e) {
     e?.preventDefault();
     if (!form.toName.trim() || !form.fromName.trim() || !form.message.trim()) {
@@ -188,19 +250,32 @@ function App() {
       setToast("اكتب رقم العملية الظاهر في رسالة تحويل أورنج كاش.");
       return;
     }
+    if (form.password && form.password.length < 4) { setToast("كلمة مرور الهدية لازم تكون 4 أحرف على الأقل."); return; }
     setSaving(true);
+    const privatePayload = { message: form.message.trim(), photos: form.photos.map(p => p.data), cover: form.cover || form.photos[0]?.data || "", audio_url: form.audioUrl || "", audio_name: form.audioName || "", video_url: form.videoUrl || "" };
+    let securePayload = null;
+    try { if (form.password) securePayload = await encryptGiftPayload(privatePayload, form.password); }
+    catch { setSaving(false); setToast("تعذر تشفير محتوى الهدية على هذا المتصفح."); return; }
     const record = {
       slug: slug(),
       title: form.title.trim() || `هدية إلى ${form.toName}`,
       from_name: form.fromName.trim(),
       to_name: form.toName.trim(),
-      message: form.message.trim(),
+      message: form.password ? "الهدية دي محمية بكلمة مرور ❤️" : form.message.trim(),
       date: form.date || null,
       occasion: form.occasion,
       theme: form.theme,
-      photos: form.photos.map(p => p.data),
-      cover: form.cover || form.photos[0]?.data || "",
-      music: !!form.music
+      photos: form.password ? [] : form.photos.map(p => p.data),
+      cover: form.password ? "" : (form.cover || form.photos[0]?.data || ""),
+      music: !!form.music,
+      audio_url: form.password ? "" : (form.audioUrl || ""),
+      audio_name: form.password ? "" : (form.audioName || ""),
+      video_url: form.password ? "" : (form.videoUrl || ""),
+      expires_at: form.expiresAt || null,
+      custom_accent: form.customAccent || "",
+      font_family: form.fontFamily || "Cairo",
+      locked: !!form.password,
+      secure_payload: securePayload
     };
     try {
       const response = await fetch("/api/payments/create", {
@@ -280,7 +355,7 @@ function App() {
 
       {page === "home" && <Home gifts={gifts} startCreate={startCreate} openGift={openGift} setPage={setPage} />}
       {page === "how" && <How startCreate={startCreate} />}
-      {page === "create" && <CreatePage form={form} setField={setField} themes={themes} theme={theme} handlePhoto={handlePhoto} createGift={createGift} saving={saving} />}
+      {page === "create" && <CreatePage form={form} setField={setField} themes={themes} theme={theme} handlePhoto={handlePhoto} handleMediaUpload={handleMediaUpload} createGift={createGift} saving={saving} />
       {page === "success" && <Success gift={activeGift} shareUrl={shareUrl} copyLink={copyLink} whatsappShare={whatsappShare} startCreate={startCreate} openGift={() => openGift(activeGift)} />}
       {page === "view" && <GiftView gift={activeGift} theme={giftTheme} loading={giftLoading} goHome={goHome} startCreate={startCreate} />}
       {page === "payment-return" && <PaymentReturn goHome={goHome} />}
@@ -393,7 +468,7 @@ function WalletNumber() {
   return <span>{walletError || "جاري تحميل رقم محفظة الاستقبال..."}</span>;
 }
 
-function CreatePage({ form, setField, themes, theme, handlePhoto, createGift, saving }) {
+function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpload, createGift, saving }) {
   const [preview, setPreview] = useState(false);
   const [messageStyle, setMessageStyle] = useState("romantic");
   const messageIdeas = {
@@ -429,17 +504,23 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, createGift, sa
             </div>
           </div>
           <label>الرسالة<textarea value={form.message} onChange={e=>setField("message",e.target.value)} rows={6} maxLength={1800} required placeholder="اكتب رسالتك هنا..."/></label>
+          <button type="button" className="btn btn-outline" onClick={async()=>{try{const r=await fetch("/api/ai/message",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({toName:form.toName,fromName:form.fromName,occasion:form.occasion,style:messageStyle,currentMessage:form.message})});const d=await r.json();if(!r.ok)throw new Error(d.error||"تعذر كتابة الرسالة.");setField("message",d.message); }catch(e){window.alert(e.message||"تعذر كتابة الرسالة.");}}}><WandSparkles size={16}/> اكتب لي رسالة مخصصة بالذكاء الاصطناعي</button>
           <div className="textarea-foot"><span>خليها بكلامك، ده اللي بيفرق ❤️</span><span>{form.message.length}/1800</span></div>
         </div>
         <div className="form-section">
           <div className="form-section-title"><span className="form-icon"><Camera size={19}/></span><div><h2>صور بتحكي</h2><p>ضيف لحد 5 صور من الذكريات اللي بتحبوها.</p></div></div>
           <label className="upload-box"><input type="file" accept="image/*" multiple onChange={handlePhoto} hidden/><span className="upload-icon"><ImagePlus size={25}/></span><strong>اضغط لاختيار الصور</strong><small>JPG أو PNG — حتى 5 صور</small><span className="upload-button"><Upload size={15}/> اختار الصور</span></label>
           {form.photos.length > 0 && <div className="uploaded-grid">{form.photos.map((p,i)=><div className="uploaded-photo" key={i}><img src={p.data} alt={`صورة ${i+1}`}/><button type="button" onClick={()=>setField("photos",form.photos.filter((_,j)=>i!==j))} aria-label="حذف الصورة"><Trash2 size={15}/></button></div>)}</div>}
-          <label className="check-row"><input type="checkbox" checked={form.music} onChange={e=>setField("music",e.target.checked)}/><span className="check-custom"><Check size={13}/></span><span><strong>إظهار لمسة موسيقية في التصميم</strong><small>عرض رمز موسيقى زخرفي (لا يشغّل صوتًا تلقائيًا).</small></span><Music2 size={19}/></label>
+          <div className="media-upload-card"><h3><Music2 size={18}/> صوتك أو أغنيتك الكاملة</h3><p>ارفع تسجيل بصوتك أو أغنية MP3/M4A/WAV. المستلم يقدر يشغلها من داخل الرسالة.</p><label className="upload-box compact-upload"><input type="file" accept="audio/*" onChange={e=>handleMediaUpload(e,"audioUrl")} hidden/><span className="upload-icon"><Upload size={22}/></span><strong>{form.audioName || "اختار ملف صوتي"}</strong><small>حتى 25 ميجابايت · التشغيل بزر واضح</small><span className="upload-button">رفع الصوت</span></label>{form.audioUrl && <div className="media-preview-row"><audio controls preload="metadata" src={form.audioUrl}/><button type="button" className="btn btn-outline" onClick={()=>{setField("audioUrl","");setField("audioName","");}}>حذف الصوت</button></div>}</div>
+          <div className="media-upload-card"><h3><Video size={18}/> فيديو خاص (اختياري)</h3><p>مقطع فيديو قصير يظهر مع الرسالة.</p><label className="upload-box compact-upload"><input type="file" accept="video/*" onChange={e=>handleMediaUpload(e,"videoUrl")} hidden/><span className="upload-icon"><Upload size={22}/></span><strong>{form.videoUrl ? "تم اختيار الفيديو" : "اختار فيديو"}</strong><small>حتى 35 ميجابايت</small><span className="upload-button">رفع الفيديو</span></label>{form.videoUrl && <div className="media-preview-row"><video controls preload="metadata" src={form.videoUrl}/><button type="button" className="btn btn-outline" onClick={()=>setField("videoUrl","")}>حذف الفيديو</button></div>}</div>
+          <label className="check-row"><input type="checkbox" checked={form.music} onChange={e=>setField("music",e.target.checked)}/><span className="check-custom"><Check size={13}/></span><span><strong>إظهار لمسة موسيقية في التصميم</strong><small>لحن هادئ اختياري بجانب الصوت المرفوع.</small></span><Music2 size={19}/></label>
         </div>
         <div className="form-section">
           <div className="form-section-title"><span className="form-icon"><Flower2 size={19}/></span><div><h2>اختار الثيم</h2><p>خلي شكل الهدية يعكس إحساسك.</p></div></div>
           <div className="theme-options">{themes.map(t=><button type="button" key={t.id} className={`theme-option ${form.theme===t.id?"selected":""} option-${t.id}`} onClick={()=>setField("theme",t.id)}><span className="theme-swatch">{t.emoji}</span><span>{t.name}</span>{form.theme===t.id&&<Check size={16}/>}</button>)}</div>
+          <div className="designer-controls"><label>لون الهدية <input type="color" value={form.customAccent || theme.accent} onChange={e=>setField("customAccent",e.target.value)}/></label><label>الخط<select value={form.fontFamily || "Cairo"} onChange={e=>setField("fontFamily",e.target.value)}><option value="Cairo">Cairo</option><option value="Arial">Arial</option><option value="Tahoma">Tahoma</option><option value="Georgia">Georgia</option></select></label></div>
+          <label>انتهاء صلاحية الرابط (اختياري)<input type="date" min={new Date().toISOString().slice(0,10)} value={form.expiresAt || ""} onChange={e=>setField("expiresAt",e.target.value)}/><span className="optional">بعد التاريخ المحدد، الموقع هيعرض إن الهدية انتهت صلاحيتها.</span></label>
+          <label>كلمة مرور للهدية (اختياري)<input type="password" autoComplete="new-password" value={form.password || ""} onChange={e=>setField("password",e.target.value)} minLength={4} maxLength={80} placeholder="٤ أحرف على الأقل"/><span className="optional">محتوى الرسالة والصور والصوت والفيديو بيتشفّر قبل الإرسال، والمستلم يحتاج كلمة المرور لفتحه.</span></label>
         </div>
         <div className="builder-actions"><button type="button" className="btn btn-outline" onClick={()=>setPreview(!preview)}><Eye size={17}/>{preview?"إخفاء المعاينة":"معاينة الهدية"}</button><button type="submit" className="btn btn-primary" disabled={saving}>{saving?"جاري الحفظ...":"أنشئ هديتي"} <ArrowLeft size={17}/></button></div>
         {preview && <div className="mobile-preview"><GiftPreview form={form} theme={theme}/></div>}
@@ -503,7 +584,7 @@ function ManualPaymentPage({ pendingPayment, goHome }) {
 }
 
 function GiftPreview({ form, theme }) {
-  return <div className={`gift-preview preview-${form.theme}`} style={{background:theme.bg, "--gift-accent":theme.accent}}>
+  return <div className={`gift-preview preview-${form.theme}`} style={{background:theme.bg, "--gift-accent":form.customAccent || theme.accent,fontFamily:form.fontFamily || "Cairo"}}>
     <div className="preview-topline"><span>LAHZETNA</span><Heart size={16} fill="currentColor"/></div>
     <div className="preview-content">
       <span className="preview-kicker">{form.occasion || "هدية من القلب"}</span>
@@ -513,7 +594,8 @@ function GiftPreview({ form, theme }) {
       {form.cover ? <img className="preview-cover" src={form.cover} alt="صورة الهدية"/> : <div className="preview-placeholder"><Flower2 size={34}/><span>ذكرياتكم هنا</span></div>}
       <p className="preview-message">{form.message || "رسالتك من القلب هتظهر هنا..."}</p>
       {form.date && <div className="preview-date"><CalendarDays size={14}/>{fmtDate(form.date)}</div>}
-      {form.music && <div className="preview-music"><Music2 size={13}/> لمسة موسيقية</div>}
+      {(form.music || form.audioUrl) && <div className="preview-music"><Music2 size={13}/> {form.audioUrl ? "صوت أو أغنية مرفوعة" : "لمسة موسيقية"}</div>}
+      {form.videoUrl && <div className="preview-music"><Video size={13}/> فيديو مرفق</div>}
       <div className="preview-signature">صُنعت بحب <Heart size={11} fill="currentColor"/></div>
     </div>
   </div>;
@@ -536,12 +618,18 @@ function Success({ gift, shareUrl, copyLink, whatsappShare, startCreate, openGif
 
 function GiftView({ gift, theme, loading, goHome, startCreate }) {
   const [opened, setOpened] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState("");
+  const [unlockError, setUnlockError] = useState("");
+  const [unlockedGift, setUnlockedGift] = useState(null);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const audioContextRef = useRef(null);
   const melodyTimerRef = useRef(null);
 
   useEffect(() => {
     setOpened(false);
+    setUnlockPassword("");
+    setUnlockError("");
+    setUnlockedGift(null);
     setMusicPlaying(false);
     return () => {
       if (melodyTimerRef.current) window.clearInterval(melodyTimerRef.current);
@@ -593,7 +681,9 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
 
   if (loading) return <main className="view-page section-wrap"><div className="loader"></div><p>بنفتح هديتك...</p></main>;
   if (!gift) return <main className="not-found section-wrap"><span className="not-found-icon">♡</span><h1>الهدية دي مش موجودة</h1><p>ممكن الرابط غلط، أو الهدية محفوظة على جهاز تاني ولسه قاعدة البيانات مش متفعّلة.</p><button className="btn btn-primary" onClick={goHome}>ارجع للرئيسية</button></main>;
-  const photos = Array.isArray(gift.photos) ? gift.photos : [];
+  if (gift.expires_at && new Date(`${gift.expires_at}T23:59:59`) < new Date()) return <main className="not-found section-wrap"><span className="not-found-icon">⌛</span><h1>انتهت صلاحية الهدية</h1><p>الرابط ده انتهت صلاحيته حسب التاريخ اللي اختاره صاحب الهدية.</p><button className="btn btn-primary" onClick={goHome}>ارجع للرئيسية</button></main>;
+  const visibleGift = unlockedGift || gift;
+  const photos = Array.isArray(visibleGift.photos) ? visibleGift.photos : [];
   const downloadGift = () => {
     const text = (gift.title || "هدية من لحظتنا") + "\n\nإلى: " + (gift.to_name || "") + "\nمن: " + (gift.from_name || "") + "\nالمناسبة: " + (gift.occasion || "") + "\n\n" + (gift.message || "") + "\n\n" + (gift.date ? "التاريخ: " + fmtDate(gift.date) + "\n" : "") + "صُنعت بحب من لحظتنا";
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -606,7 +696,7 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
     <section className={`surprise-envelope theme-${gift.theme || "rose"}`} style={{background:theme.bg,"--gift-accent":theme.accent}}>
       <div className="surprise-sparkles" aria-hidden="true">✦　♡　✦</div>
       <div className="surprise-gift-icon"><Gift size={44}/></div>
-      <span className="full-kicker">{gift.occasion || "هدية من القلب"}</span>
+      <span className="full-kicker">{visibleGift.occasion || "هدية من القلب"}</span>
       <h1>فيه مفاجأة <span>{gift.to_name}</span> ❤️</h1>
       <p>رسالة مخصوصة من {gift.from_name}، اتعملت بكل حب علشان لحظتكم تبقى ذكرى.</p>
       <button className="surprise-open-btn" onClick={() => setOpened(true)}><Gift size={19}/> افتح مفاجأتك <Heart size={17} fill="currentColor"/></button>
@@ -614,20 +704,23 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
     </section>
   </main>;
 
+  if (gift.locked && !unlockedGift) return <main className="view-page section-wrap"><div className="view-top"><button className="text-link" onClick={goHome}><ChevronRight size={17}/> الرئيسية</button><span><Heart size={14} fill="currentColor"/> لحظتنا</span></div><section className="unlock-card"><div className="surprise-gift-icon"><LockKeyhole size={38}/></div><h1>الهدية دي عليها كلمة مرور</h1><p>اكتب كلمة المرور اللي صاحب الهدية بعتهالك علشان تفتح الرسالة والصور والصوت.</p><form onSubmit={async e=>{e.preventDefault();setUnlockError("");try{const content=await decryptGiftPayload(gift.secure_payload,unlockPassword);setUnlockedGift({...gift,...content,locked:false});}catch{setUnlockError("كلمة المرور مش صحيحة. جرّب تاني.");}}}><label>كلمة المرور<input type="password" value={unlockPassword} onChange={e=>setUnlockPassword(e.target.value)} autoComplete="current-password" required/></label>{unlockError&&<p className="unlock-error">{unlockError}</p>}<button className="btn btn-primary" type="submit">افتح الهدية <LockKeyhole size={16}/></button></form></section></main>;
   return <main className="view-page section-wrap">
     <div className="view-top"><button className="text-link" onClick={goHome}><ChevronRight size={17}/> الرئيسية</button><span><Heart size={14} fill="currentColor"/> لحظتنا</span></div>
-    <article className={`full-gift full-${gift.theme||"rose"}`} style={{background:theme.bg,"--gift-accent":theme.accent}}>
+    <article className={`full-gift full-${visibleGift.theme||"rose"}`} style={{background:theme.bg,"--gift-accent":visibleGift.custom_accent || theme.accent,fontFamily:visibleGift.font_family || "Cairo"}}>
       <div className="full-gift-inner">
         <div className="full-brand"><Heart size={18} fill="currentColor"/> LAHZETNA</div>
         <span className="full-kicker">{gift.occasion || "هدية من القلب"}</span>
         <div className="full-heart"><Heart size={50} fill="currentColor"/></div>
-        <h1>{gift.title || "حكايتنا لسه مكملة"}</h1>
-        <div className="full-names"><span>{gift.from_name}</span><Heart size={18} fill="currentColor"/><span>{gift.to_name}</span></div>
-        {(gift.cover || photos.length>0) && <img className="full-cover" src={gift.cover || photos[0]} alt="ذكرى خاصة"/>}
-        <div className="full-message">{gift.message}</div>
-        {gift.date && <div className="full-date"><CalendarDays size={16}/>{fmtDate(gift.date)}</div>}
+        <h1>{visibleGift.title || "حكايتنا لسه مكملة"}</h1>
+        <div className="full-names"><span>{visibleGift.from_name}</span><Heart size={18} fill="currentColor"/><span>{visibleGift.to_name}</span></div>
+        {(visibleGift.cover || photos.length>0) && <img className="full-cover" src={visibleGift.cover || (typeof photos[0]==="string" ? photos[0] : photos[0]?.data)} alt="ذكرى خاصة"/>}
+        <div className="full-message">{visibleGift.message}</div>
+        {visibleGift.date && <div className="full-date"><CalendarDays size={16}/>{fmtDate(visibleGift.date)}</div>}
         {photos.length > 1 && <div className="full-gallery">{photos.slice(0,5).map((p,i)=><img key={i} src={typeof p==="string"?p:p.data} alt={`ذكرى ${i+1}`}/>)}</div>}
-        {gift.music && <button type="button" className="preview-music melody-toggle" onClick={toggleMelody}><Music2 size={14}/> {musicPlaying ? "إيقاف اللحن" : "شغّل لحن هادئ"} {musicPlaying ? "Ⅱ" : "♫"}</button>}
+        {visibleGift.audio_url && <section className="gift-audio-panel"><h3><Music2 size={18}/> {visibleGift.audio_name || "رسالة صوتية أو أغنية"}</h3><p>اسمع الرسالة على راحتك ❤️</p><audio controls preload="metadata" src={visibleGift.audio_url}>المتصفح لا يدعم تشغيل الصوت.</audio></section>}
+        {visibleGift.video_url && <section className="gift-video-panel"><video controls preload="metadata" playsInline src={visibleGift.video_url}>المتصفح لا يدعم تشغيل الفيديو.</video></section>}
+        {visibleGift.music && <button type="button" className="preview-music melody-toggle" onClick={toggleMelody}><Music2 size={14}/> {musicPlaying ? "إيقاف اللحن" : "شغّل لحن هادئ"} {musicPlaying ? "Ⅱ" : "♫"}</button>}
         <div className="full-signature">اتعملت بكل حب <Heart size={14} fill="currentColor"/></div>
       </div>
     </article>
