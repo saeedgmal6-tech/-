@@ -130,3 +130,19 @@
 .admin-export-row .admin-gift-search{flex:1;min-width:220px;margin:0}
 .admin-export-row .admin-btn{white-space:nowrap}
 @media(max-width:600px){.admin-export-row{align-items:stretch;flex-direction:column}.admin-export-row .admin-gift-search{width:100%;min-width:0}.admin-export-row .admin-btn{width:100%;justify-content:center}}
+
+/* Memory timeline editor and gift presentation */
+.timeline-editor{display:grid;gap:12px;margin:14px 0}
+.timeline-edit-card{display:grid;gap:11px;padding:15px;border:1px solid var(--line);border-radius:14px;background:#fffdfd}
+.timeline-edit-head{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--ink);font-size:13px}
+.timeline-edit-card label{display:grid;gap:7px;font-size:12px;font-weight:700}
+.timeline-edit-card input,.timeline-edit-card textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font:inherit;font-size:12px}
+.gift-timeline{width:min(100%,620px);margin:28px auto;text-align:right;padding:20px;border:1px solid #ffffff8c;border-radius:18px;background:#ffffff65}
+.gift-timeline>.eyebrow{display:flex;align-items:center;gap:7px;justify-content:center}
+.gift-timeline-list{display:grid;gap:0;margin-top:18px}
+.gift-timeline-item{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;position:relative;padding:0 0 22px}
+.gift-timeline-item:not(:last-child):after{content:"";position:absolute;right:16px;top:31px;bottom:0;width:1px;background:color-mix(in srgb,var(--gift-accent,#b83f65) 32%,transparent)}
+.gift-timeline-dot{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--gift-accent,#b83f65);color:white;font-size:12px;font-weight:800;z-index:1}
+.gift-timeline-item h3{margin:3px 0 6px;font-size:15px;color:var(--ink,#382a31)}
+.gift-timeline-item time{font-size:11px;opacity:.72}
+.gift-timeline-item p{margin:8px 0 0;font-size:13px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere}
