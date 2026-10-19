@@ -29,6 +29,7 @@ function normalizeGift(record) {
         custom_accent: /^#[0-9a-f]{6}$/i.test(String(record.custom_accent || "")) ? record.custom_accent : "",
         font_family: ["Cairo","Arial","Tahoma","Georgia"].includes(record.font_family) ? record.font_family : "Cairo",
         locked: Boolean(record.locked),
+        owner_token: /^[a-f0-9]{64}$/i.test(String(record.owner_token || "")) ? String(record.owner_token).toLowerCase() : "",
         secure_payload: record.secure_payload && typeof record.secure_payload === "object" ? record.secure_payload : null
       } }
     ],
