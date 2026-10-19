@@ -60,7 +60,7 @@ function App() {
   useEffect(() => {
     const path = window.location.pathname || "/";
     if (path === "/admin" || path.startsWith("/api/")) return;
-    if (/^\\/g\\/[^/]+/.test(path) && page !== "view") return;
+    if (path.startsWith("/g/") && page !== "view") return;
     const viewKey = path + "|" + page;
     if (lastTrackedView.current === viewKey) return;
     lastTrackedView.current = viewKey;
