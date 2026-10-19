@@ -40,7 +40,24 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, status: "rejected" });
   }
 
-  const { error: giftError } = await db.from("gifts").insert({ ...order.gift, created_at: new Date().toISOString() });
+  const giftToPublish = { ...order.gift, created_at: new Date().toISOString() };
+  let { error: giftError } = await db.from("gifts").insert(giftToPublish);
+  // Older production databases may still have the original four-theme constraint.
+  // Retry only when that exact constraint blocks a newer theme; preserve all other gift fields.
+  if (giftError && giftError.code === "23514" && String(giftError.message || "").includes("gifts_theme_check")) {
+    const compatibleTheme = {
+      sunset: "rose",
+      lavender: "cream",
+      ocean: "garden",
+      midnight: "night"
+    };
+    const fallbackTheme = compatibleTheme[giftToPublish.theme];
+    if (fallbackTheme) {
+      giftToPublish.theme = fallbackTheme;
+      const retry = await db.from("gifts").insert(giftToPublish);
+      giftError = retry.error;
+    }
+  }
   if (giftError && giftError.code !== "23505") {
     console.error("Manual approval gift insert failed:", giftError.message);
     return res.status(500).json({ error: "تعذر نشر الهدية. لم يتم إنهاء مراجعة الطلب." });
