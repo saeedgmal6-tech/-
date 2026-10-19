@@ -20,6 +20,7 @@ function normalizeGift(record) {
         audio_name: String(record.audio_name || "").slice(0, 180),
         video_url: typeof record.video_url === "string" ? record.video_url : "",
         expires_at: record.expires_at || null,
+        open_at: record.open_at || null,
         custom_accent: /^#[0-9a-f]{6}$/i.test(String(record.custom_accent || "")) ? record.custom_accent : "",
         font_family: ["Cairo","Arial","Tahoma","Georgia"].includes(record.font_family) ? record.font_family : "Cairo",
         locked: Boolean(record.locked),
