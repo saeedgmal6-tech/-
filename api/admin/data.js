@@ -39,6 +39,12 @@ export default async function handler(req, res) {
     db.from("gift_orders").select("id,amount_cents", { count: "exact" }).eq("status", "approved")
   ]);
 
+  const eventsSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const [eventsResult, repliesResult] = await Promise.all([
+    db.from("site_events").select("event,created_at").gte("created_at", eventsSince),
+    db.from("gift_replies").select("id,slug,reaction,message,created_at").order("created_at", { ascending: false }).limit(100)
+  ]);
+
   // Read gifts in pages so the admin dashboard isn't silently capped at the newest 300.
   const allGifts = [];
   let giftsError = null;
@@ -59,11 +65,20 @@ export default async function handler(req, res) {
   const visits = visitsResult.data || [];
   const approvedOrders = approvedOrdersResult.data || [];
   const totalRevenueCents = approvedOrders.reduce((sum, order) => sum + Number(order.amount_cents || 0), 0);
+  const funnel = { giftStarts: 0, paymentSubmissions: 0, giftViews: 0, replies: 0 };
+  for (const event of eventsResult.data || []) {
+    if (event.event === "gift_start") funnel.giftStarts++;
+    if (event.event === "payment_submitted") funnel.paymentSubmissions++;
+    if (event.event === "gift_view") funnel.giftViews++;
+    if (event.event === "reply_submitted") funnel.replies++;
+  }
   const counts = new Map();
   for (const visit of visits) counts.set(visit.path, (counts.get(visit.path) || 0) + 1);
   const topPaths = [...counts.entries()].map(([path, count]) => ({ path, count })).sort((a, b) => b.count - a.count).slice(0, 8);
   return res.status(200).json({
     stats: { totalVisits: visitCountResult.count || 0, visits7d: visits7Result.count || 0, totalGifts: allGifts.length, approvedOrders: approvedOrdersResult.count || 0, totalRevenueCents },
+    funnel,
+    replies: repliesResult.data || [],
     gifts: allGifts,
     pendingOrders: pendingOrdersResult.data || [],
     visits,
