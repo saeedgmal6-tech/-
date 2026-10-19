@@ -36,7 +36,7 @@ function fmtDate(value) {
   try { return new Date(value + "T12:00:00").toLocaleDateString("ar-EG", {year:"numeric",month:"long",day:"numeric"}); } catch { return value; }
 }
 function App() {
-  const [page, setPage] = useState(() => window.location.pathname === "/admin" ? "admin" : "home");
+  const [page, setPage] = useState(() => window.location.pathname === "/admin" ? "admin" : window.location.pathname === "/payment-return" ? "payment-return" : "home");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [gifts, setGifts] = useState(readLocal);
   const [activeGift, setActiveGift] = useState(null);
@@ -44,7 +44,7 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "حكايتنا لسه مكملة", fromName: "", toName: "", message: "في وسط كل الأيام العادية، إنت أجمل حاجة حصلتلي. كل لحظة معاك بتستاهل تتحكي، وكل ذكرى بينا ليها مكان خاص في قلبي. ❤️",
-    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false
+    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, payerPhone: ""
   });
   const [giftLoading, setGiftLoading] = useState(false);
 
@@ -79,6 +79,50 @@ function App() {
     const t = setTimeout(() => setToast(""), 3000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (page !== "payment-return") return;
+    const slugFromUrl = new URLSearchParams(window.location.search).get("slug") || "";
+    if (!slugFromUrl) {
+      setToast("رابط متابعة الدفع غير صحيح.");
+      setPage("home");
+      return;
+    }
+    let stopped = false;
+    let attempts = 0;
+    const checkStatus = async () => {
+      attempts += 1;
+      try {
+        const response = await fetch(`/api/payments/status?slug=${encodeURIComponent(slugFromUrl)}`, { cache: "no-store" });
+        const result = await response.json();
+        if (stopped) return;
+        if (response.ok && result.status === "paid" && result.gift) {
+          stopped = true;
+          setActiveGift(result.gift);
+          setGifts(prev => [result.gift, ...prev.filter(g => g.slug !== result.gift.slug)]);
+          window.history.replaceState({}, "", `/g/${result.gift.slug}`);
+          setPage("success");
+          return;
+        }
+        if (result.status === "failed" || result.status === "not_found") {
+          stopped = true;
+          setToast("الدفع لم يتأكد. لو المبلغ اتخصم، تواصل مع الدعم قبل إعادة الدفع.");
+          setPage("home");
+          window.history.replaceState({}, "", "/");
+          return;
+        }
+      } catch {}
+      if (attempts >= 40 && !stopped) {
+        stopped = true;
+        setToast("الدفع لسه قيد التأكيد. افتح هداياي بعد لحظات أو تواصل مع الدعم لو المبلغ اتخصم.");
+        setPage("home");
+        window.history.replaceState({}, "", "/");
+      }
+    };
+    checkStatus();
+    const timer = setInterval(checkStatus, 2500);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [page]);
 
   async function loadGift(id) {
     setGiftLoading(true);
@@ -135,6 +179,10 @@ function App() {
       setToast("اكتب اسم المُهدى إليه واسمك والرسالة الأول.");
       return;
     }
+    if (!/^(\\+?20)?1[0125][0-9]{8}$/.test(String(form.payerPhone || "").replace(/[\\s()-]/g, ""))) {
+      setToast("اكتب رقم موبايل مصري صحيح علشان تكمل الدفع بالمحفظة.");
+      return;
+    }
     setSaving(true);
     const record = {
       slug: slug(),
@@ -147,54 +195,26 @@ function App() {
       theme: form.theme,
       photos: form.photos.map(p => p.data),
       cover: form.cover || form.photos[0]?.data || "",
-      music: !!form.music,
-      created_at: new Date().toISOString()
+      music: !!form.music
     };
-    let persisted = false;
-    let savedGift = null;
-    let saveError = "";
-    // Save through the server first so every visitor's gift reaches the shared archive,
-    // instead of relying on that visitor's browser localStorage.
     try {
-      const response = await fetch("/api/gifts", {
+      const response = await fetch("/api/payments/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(record)
+        body: JSON.stringify({ gift: record, phone: form.payerPhone })
       });
       const result = await response.json().catch(() => ({}));
-      if (response.ok && result.gift) {
-        savedGift = result.gift;
-        persisted = true;
-      } else {
-        saveError = result.error || "تعذر الحفظ على الموقع.";
+      if (!response.ok || !result.checkoutUrl) {
+        setSaving(false);
+        setToast(result.error || "تعذر بدء الدفع. حاول مرة أخرى.");
+        return;
       }
+      // The gift is not published or shown as successful until the signed Paymob webhook confirms payment.
+      window.location.assign(result.checkoutUrl);
     } catch {
-      saveError = "تعذر الاتصال بخدمة حفظ الهدايا.";
+      setSaving(false);
+      setToast("تعذر الاتصال ببوابة الدفع. تحقق من الإنترنت وحاول مرة أخرى.");
     }
-
-    // Compatibility fallback for existing Supabase public insert configuration.
-    if (!persisted && supabase) {
-      const { data, error } = await supabase.from("gifts").insert(record).select().single();
-      if (!error && data) {
-        savedGift = data;
-        persisted = true;
-      } else {
-        console.error("Supabase save failed:", error || saveError);
-      }
-    }
-
-    if (persisted && savedGift) {
-      setGifts(prev => [savedGift, ...prev.filter(g => g.slug !== savedGift.slug)]);
-      setActiveGift(savedGift);
-    } else {
-      const localRecord = { ...record, id: record.slug, storage_mode: "local" };
-      setGifts(prev => [localRecord, ...prev.filter(g => g.slug !== localRecord.slug)]);
-      setActiveGift(localRecord);
-    }
-    setSaving(false);
-    setPage("success");
-    window.history.pushState({}, "", `/g/${record.slug}`);
-    if (!persisted) setToast("الهدية محفوظة على جهازك فقط ولم تُضف لأرشيف الموقع. " + (saveError || "راجع اتصال الحفظ."));
   }
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -257,6 +277,7 @@ function App() {
       {page === "create" && <CreatePage form={form} setField={setField} themes={themes} theme={theme} handlePhoto={handlePhoto} createGift={createGift} saving={saving} />}
       {page === "success" && <Success gift={activeGift} shareUrl={shareUrl} copyLink={copyLink} whatsappShare={whatsappShare} startCreate={startCreate} openGift={() => openGift(activeGift)} />}
       {page === "view" && <GiftView gift={activeGift} theme={giftTheme} loading={giftLoading} goHome={goHome} startCreate={startCreate} />}
+      {page === "payment-return" && <PaymentReturn goHome={goHome} />}
       {page === "mygifts" && <MyGifts gifts={gifts} openGift={openGift} startCreate={startCreate} setGifts={setGifts} setToast={setToast} />}
       <footer className="footer">
         <div className="footer-inner">
@@ -367,6 +388,8 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, createGift, sa
           <div className="form-section-title"><span className="form-icon"><Heart size={19}/></span><div><h2>الحكاية بتبدأ بمين؟</h2><p>خلينا نعرف الهدية لمين ومن مين.</p></div></div>
           <label>عنوان الهدية<input value={form.title} onChange={e=>setField("title",e.target.value)} placeholder="مثلاً: حكايتنا لسه مكملة" maxLength={90}/></label>
           <div className="field-grid"><label>اسمك<input value={form.fromName} onChange={e=>setField("fromName",e.target.value)} placeholder="اسمك" required maxLength={60}/></label><label>اسم الشخص<input value={form.toName} onChange={e=>setField("toName",e.target.value)} placeholder="اسم حبيبك" required maxLength={60}/></label></div>
+          <label>رقم موبايلك للدفع بالمحفظة<input type="tel" inputMode="tel" autoComplete="tel" value={form.payerPhone || ""} onChange={e=>setField("payerPhone",e.target.value)} placeholder="01xxxxxxxxx" required maxLength={15}/><span className="optional">سيُستخدم لإتمام الدفع عبر بوابة الدفع فقط.</span></label>
+          <div className="payment-price-note"><span>سعر إنشاء الهدية</span><strong>20 جنيه مصري</strong><small>الدفع آمن عبر بوابة إلكترونية، ولن يتم نشر الهدية إلا بعد تأكيد الدفع.</small></div>
           <label>المناسبة<select value={form.occasion} onChange={e=>setField("occasion",e.target.value)}>{occasions.map(o=><option key={o}>{o}</option>)}</select></label>
           <label>التاريخ المميز <span className="optional">(اختياري)</span><div className="input-icon"><CalendarDays size={18}/><input type="date" value={form.date} onChange={e=>setField("date",e.target.value)}/></div></label>
         </div>
@@ -398,6 +421,19 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, createGift, sa
         {preview && <div className="mobile-preview"><GiftPreview form={form} theme={theme}/></div>}
       </form>
       <aside className="preview-column"><div className="preview-sticky"><div className="preview-label"><Eye size={16}/> معاينة مباشرة</div><GiftPreview form={form} theme={theme}/><p className="preview-tip"><Sparkles size={15}/> المعاينة بتتغير مع كل تعديل.</p></div></aside>
+    </div>
+  </main>;
+}
+
+function PaymentReturn({ goHome }) {
+  return <main className="section-wrap payment-return-page">
+    <div className="payment-wait-card">
+      <div className="payment-wait-icon"><Clock3 size={30}/></div>
+      <span className="eyebrow">لحظتنا · تأكيد الدفع</span>
+      <h1>بنتأكد من الدفع...</h1>
+      <p>هننشر هديتك أول ما بوابة الدفع تأكد نجاح العملية. من فضلك ما تقفلش الصفحة.</p>
+      <div className="payment-wait-status"><span className="payment-pulse"></span> جاري انتظار التأكيد الآمن</div>
+      <button className="btn btn-outline" onClick={goHome}>العودة للرئيسية</button>
     </div>
   </main>;
 }
