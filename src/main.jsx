@@ -391,10 +391,10 @@ function App() {
             <span className="brand-text"><strong>لحظتنا</strong><small>LAHZETNA</small></span>
           </button>
           <nav className={mobileMenu ? "nav-links open" : "nav-links"}>
-            <button onClick={goHome}>الرئيسية</button>
+            <button onClick={() => { setMobileMenu(false); goHome(); }}>الرئيسية</button>
             <button onClick={() => {setPage("how");setMobileMenu(false)}}>إزاي بتشتغل؟</button>
             <button onClick={() => {setPage("mygifts");setMobileMenu(false)}}>هداياي</button>
-            <button className="nav-cta" onClick={startCreate}>اصنع هديتك <ArrowLeft size={16}/></button>
+            <button className="nav-cta" onClick={() => {setMobileMenu(false); startCreate();}}>اصنع هديتك <ArrowLeft size={16}/></button>
           </nav>
           <button className="menu-toggle" onClick={() => setMobileMenu(!mobileMenu)} aria-label="القائمة">{mobileMenu ? <X/> : <Menu/>}</button>
         </div>
@@ -614,6 +614,18 @@ function PaymentReturn({ goHome }) {
 
 function ManualPaymentPage({ pendingPayment, goHome }) {
   const [status, setStatus] = useState("awaiting_review");
+  const [approvedGift, setApprovedGift] = useState(null);
+  const [shareNotice, setShareNotice] = useState("");
+  const approvedUrl = approvedGift?.slug ? window.location.origin + "/g/" + encodeURIComponent(approvedGift.slug) : "";
+  async function shareApprovedGift() {
+    if (!approvedUrl) return;
+    try {
+      if (navigator.share) await navigator.share({ title: approvedGift.title || "هدية من لحظتنا", text: "عملتلك هدية مخصوص من قلبي ❤️", url: approvedUrl });
+      else { await navigator.clipboard.writeText(approvedUrl); setShareNotice("تم نسخ رابط الهدية، ابعته للشخص اللي بتحبه ❤️"); }
+    } catch (error) {
+      if (error?.name !== "AbortError") { try { await navigator.clipboard.writeText(approvedUrl); setShareNotice("تم نسخ رابط الهدية ❤️"); } catch { window.prompt("انسخ رابط الهدية وشاركه:", approvedUrl); } }
+    }
+  }
   useEffect(() => {
     if (!pendingPayment?.slug) return;
     let stopped = false;
@@ -624,7 +636,8 @@ function ManualPaymentPage({ pendingPayment, goHome }) {
         if (stopped) return;
         if (response.ok && data.status === "approved" && data.gift) {
           stopped = true;
-          window.location.assign("/g/" + encodeURIComponent(data.gift.slug));
+          setApprovedGift(decodeGiftRecord(data.gift));
+          setStatus("approved");
           return;
         }
         if (data.status === "rejected") { setStatus("rejected"); stopped = true; }
@@ -638,7 +651,15 @@ function ManualPaymentPage({ pendingPayment, goHome }) {
     <div className="payment-wait-card">
       <div className="payment-wait-icon"><Clock3 size={30}/></div>
       <span className="eyebrow">لحظتنا · مراجعة التحويل</span>
-      {status === "rejected" ? <>
+      {status === "approved" && approvedGift ? <>
+        <div className="payment-approved-icon"><Check size={30}/></div>
+        <h1>مبروك! هديتك اتوافَق عليها ❤️</h1>
+        <p>بقت جاهزة للنشر والمشاركة. ابعت الرابط للشخص اللي عملتله الهدية.</p>
+        <div className="approved-share-link" dir="ltr">{approvedUrl}</div>
+        <button className="btn btn-primary approved-share-button" onClick={shareApprovedGift}><Share2 size={18}/> مشاركة الهدية</button>
+        <button className="btn btn-outline approved-open-button" onClick={() => window.location.assign(approvedUrl)}><Eye size={17}/> معاينة الهدية</button>
+        {shareNotice && <p className="approved-share-notice" role="status">{shareNotice}</p>}
+      </> : status === "rejected" ? <>
         <h1>الطلب مرفوض</h1>
         <p>لم يتم اعتماد التحويل. راجع رقم العملية أو تواصل مع إدارة الموقع قبل إرسال طلب جديد.</p>
       </> : <>
@@ -648,7 +669,7 @@ function ManualPaymentPage({ pendingPayment, goHome }) {
         {pendingPayment?.orderId && <p>رقم الطلب: <b dir="ltr">{pendingPayment.orderId}</b></p>}
         {pendingPayment?.walletNumber && <p>محفظة الاستقبال: <b dir="ltr">{pendingPayment.walletNumber}</b></p>}
       </>}
-      <button className="btn btn-outline" onClick={goHome}>العودة للرئيسية</button>
+      {status !== "approved" && <button className="btn btn-outline" onClick={goHome}>العودة للرئيسية</button>}
     </div>
   </main>;
 }
