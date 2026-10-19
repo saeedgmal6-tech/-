@@ -1,4 +1,4 @@
-const CACHE_NAME = "lahzetna-shell-v1";
+const CACHE_NAME = "lahzetna-shell-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -14,6 +14,17 @@ self.addEventListener("fetch", event => {
     event.respondWith(fetch(request).then(response => {
       if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put("/", response.clone()));
       return response;
-    }).catch(() => caches.match("/") ));
+    }).catch(() => caches.match("/")));
+    return;
+  }
+  if (["script", "style", "font", "image"].includes(request.destination)) {
+    event.respondWith(caches.open(CACHE_NAME).then(async cache => {
+      const cached = await cache.match(request);
+      const network = fetch(request).then(response => {
+        if (response.ok) cache.put(request, response.clone());
+        return response;
+      });
+      return cached || network;
+    }).catch(() => caches.match(request)));
   }
 });
