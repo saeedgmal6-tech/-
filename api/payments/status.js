@@ -10,13 +10,15 @@ export default async function handler(req, res) {
   if (!/^[a-z0-9]{6,40}$/i.test(slug)) return res.status(400).json({ error: "طلب غير صالح." });
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return res.status(503).json({ error: "خدمة الدفع غير مفعلة." });
+  if (!url || !key) return res.status(503).json({ error: "خدمة الطلبات غير مفعلة." });
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: order, error } = await db.from("gift_orders").select("status,slug").eq("slug", slug).maybeSingle();
-  if (error) return res.status(500).json({ error: "تعذر التحقق من حالة الدفع." });
+  if (error) return res.status(500).json({ error: "تعذر التحقق من حالة الطلب." });
   if (!order) return res.status(404).json({ status: "not_found" });
-  if (order.status !== "paid") return res.status(200).json({ status: order.status });
+  if (order.status === "rejected" || order.status === "failed") return res.status(200).json({ status: order.status });
+  if (order.status !== "approved" && order.status !== "paid") return res.status(200).json({ status: "awaiting_review" });
   const { data: gift, error: giftError } = await db.from("gifts").select("*").eq("slug", slug).maybeSingle();
   if (giftError) return res.status(500).json({ error: "تعذر تحميل الهدية." });
-  return res.status(200).json({ status: "paid", gift });
+  if (!gift) return res.status(200).json({ status: "awaiting_review" });
+  return res.status(200).json({ status: "approved", gift });
 }
