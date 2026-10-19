@@ -81,7 +81,7 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "حكايتنا لسه مكملة", fromName: "", toName: "", message: "في وسط كل الأيام العادية، إنت أجمل حاجة حصلتلي. كل لحظة معاك بتستاهل تتحكي، وكل ذكرى بينا ليها مكان خاص في قلبي. ❤️",
-    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, audioUrl: "", audioName: "", videoUrl: "", expiresAt: "", password: "", customAccent: "", fontFamily: "Cairo", payerPhone: "", transferReference: ""
+    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, audioUrl: "", audioName: "", videoUrl: "", expiresAt: "", openAt: "", password: "", customAccent: "", fontFamily: "Cairo", payerPhone: "", transferReference: ""
   });
   const [giftLoading, setGiftLoading] = useState(false);
 
@@ -272,6 +272,7 @@ function App() {
       audio_name: form.password ? "" : (form.audioName || ""),
       video_url: form.password ? "" : (form.videoUrl || ""),
       expires_at: form.expiresAt || null,
+      open_at: form.openAt || null,
       custom_accent: form.customAccent || "",
       font_family: form.fontFamily || "Cairo",
       locked: !!form.password,
@@ -504,7 +505,13 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpl
     romantic: "يا " + (form.toName || "أجمل شخص") + "، وجودك في حياتي بيخلّي أبسط الأيام مختلفة. كل ذكرى معاك غالية، ونفسي نفضل نخلق لحظات جديدة نفتكرها طول العمر. بحبك أكتر من الكلام ❤️",
     apology: "يمكن الكلام مش كفاية، بس حابب أقولك إنك غالي عندي وإن زعلك بيفرق معايا. أتمنى نقدر نتكلم ونفهم بعض، لأن وجودك في حياتي يستاهل إني أحاول من قلبي. 🤍",
     friendship: "في ناس وجودها بيخلّي الدنيا أهون وأجمل، وإنت من الناس دي. شكرًا على كل موقف حلو وكل ضحكة وكل ذكرى. أتمنى تفضل أيامنا مليانة حاجات حلوة سوا 💛",
-    birthday: "كل سنة وإنت طيب يا أجمل هدية في الدنيا! أتمنى سنتك الجديدة تكون مليانة راحة وفرح ونجاحات، وتحقق فيها كل اللي نفسك فيه. وجودك لوحده سبب للفرحة 🎂"
+    birthday: "كل سنة وإنت طيب يا أجمل هدية في الدنيا! أتمنى سنتك الجديدة تكون مليانة راحة وفرح ونجاحات، وتحقق فيها كل اللي نفسك فيه. وجودك لوحده سبب للفرحة 🎂",
+    anniversary: "كل سنة وإحنا أقرب لبعض، وكل ذكرى بينا بتأكدلي إن أجمل اختياراتي كانت إني عرفتك. نفسي نفضل نكبر سوا ونحتفل بكل لحظة جاية ❤️",
+    longing: "وحشتني تفاصيلك الصغيرة، كلامك وضحكتك ووجودك اللي بيخلّي اليوم أهدى. مهما بعدتنا الأيام، مكانك جوا قلبي ثابت 🤍",
+    wedding: "النهارده بداية فصل جديد من حكايتنا، بوعدك أكون سند وونس وأمان، ونبني مع بعض أيام نحب نفتكرها طول العمر 💍",
+    mother: "كل سنة وإنتِ طيبة يا أحن قلب. مهما قلت مش هقدر أوفيكي حقك، ربنا يديمك نعمة في حياتنا ويديكي راحة وفرحة على قد قلبك ❤️",
+    thanks: "يمكن مش بقولها كتير، بس وجودك فارق معايا جدًا. شكرًا إنك كنت موجود، وشكرًا على كل مرة خففت عني من غير ما تحس 💛",
+    encouragement: "أنا مؤمن بيك وبكل خطوة بتاخدها، حتى لو الطريق طويل. خدها يوم بيوم، وافتكر إنك أقوى مما تتخيل وإنك تستاهل كل خير ✨"
   };
   const applyMessageIdea = () => setField("message", messageIdeas[messageStyle]);
   return <main className="create-page section-wrap">
@@ -527,13 +534,12 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpl
             <div className="message-assistant-head"><WandSparkles size={17}/><strong>ساعدني أبدأ الرسالة</strong><small>اقتراحات جاهزة تقدر تعدلها بكلامك</small></div>
             <div className="message-idea-controls">
               <select aria-label="نوع الرسالة" value={messageStyle} onChange={e=>setMessageStyle(e.target.value)}>
-                <option value="romantic">رومانسية</option><option value="apology">اعتذار</option><option value="friendship">صداقة وامتنان</option><option value="birthday">عيد ميلاد</option>
+                <option value="romantic">رومانسية</option><option value="apology">اعتذار</option><option value="friendship">صداقة وامتنان</option><option value="birthday">عيد ميلاد</option><option value="anniversary">ذكرى سنوية</option><option value="longing">اشتياق</option><option value="wedding">زواج وخطوبة</option><option value="mother">عيد الأم</option><option value="thanks">شكر وامتنان</option><option value="encouragement">تشجيع ودعم</option>
               </select>
               <button type="button" className="btn btn-outline" onClick={applyMessageIdea}>استخدم الاقتراح</button>
             </div>
           </div>
           <label>الرسالة<textarea value={form.message} onChange={e=>setField("message",e.target.value)} rows={6} maxLength={1800} required placeholder="اكتب رسالتك هنا..."/></label>
-          <button type="button" className="btn btn-outline" onClick={async()=>{try{const r=await fetch("/api/ai/message",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({toName:form.toName,fromName:form.fromName,occasion:form.occasion,style:messageStyle,currentMessage:form.message})});const d=await r.json();if(!r.ok)throw new Error(d.error||"تعذر كتابة الرسالة.");if(d.fallback)window.alert(d.notice);setField("message",d.message); }catch(e){window.alert(e.message||"تعذر كتابة الرسالة.");}}}><WandSparkles size={16}/> اكتب لي رسالة مخصصة بالذكاء الاصطناعي</button>
           <div className="textarea-foot"><span>خليها بكلامك، ده اللي بيفرق ❤️</span><span>{form.message.length}/1800</span></div>
         </div>
         <div className="form-section">
@@ -548,6 +554,7 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpl
           <div className="form-section-title"><span className="form-icon"><Flower2 size={19}/></span><div><h2>اختار الثيم</h2><p>خلي شكل الهدية يعكس إحساسك.</p></div></div>
           <div className="theme-options">{themes.map(t=><button type="button" key={t.id} className={`theme-option ${form.theme===t.id?"selected":""} option-${t.id}`} onClick={()=>setField("theme",t.id)}><span className="theme-swatch">{t.emoji}</span><span>{t.name}</span>{form.theme===t.id&&<Check size={16}/>}</button>)}</div>
           <div className="designer-controls"><label>لون الهدية <input type="color" value={form.customAccent || theme.accent} onChange={e=>setField("customAccent",e.target.value)}/></label><label>الخط<select value={form.fontFamily || "Cairo"} onChange={e=>setField("fontFamily",e.target.value)}><option value="Cairo">Cairo</option><option value="Arial">Arial</option><option value="Tahoma">Tahoma</option><option value="Georgia">Georgia</option></select></label></div>
+          <label>ميعاد فتح المفاجأة (اختياري)<input type="datetime-local" min={new Date().toISOString().slice(0,16)} value={form.openAt || ""} onChange={e=>setField("openAt",e.target.value)}/><span className="optional">قبل الموعد المحدد، صفحة الهدية هتعرض عدًّا تنازليًا. الميزة دي للعرض فقط وليست قفلًا أمنيًا.</span></label>
           <label>انتهاء صلاحية الرابط (اختياري)<input type="date" min={new Date().toISOString().slice(0,10)} value={form.expiresAt || ""} onChange={e=>setField("expiresAt",e.target.value)}/><span className="optional">بعد التاريخ المحدد، الموقع هيعرض إن الهدية انتهت صلاحيتها.</span></label>
           <label>كلمة مرور للهدية (اختياري)<input type="password" autoComplete="new-password" value={form.password || ""} onChange={e=>setField("password",e.target.value)} minLength={4} maxLength={80} placeholder="٤ أحرف على الأقل"/><span className="optional">محتوى الرسالة والصور والصوت والفيديو بيتشفّر قبل الإرسال، والمستلم يحتاج كلمة المرور لفتحه.</span></label>
         </div>
@@ -651,10 +658,12 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
   const [unlockError, setUnlockError] = useState("");
   const [unlockedGift, setUnlockedGift] = useState(null);
   const [musicPlaying, setMusicPlaying] = useState(false);
+  const [clockNow, setClockNow] = useState(Date.now());
   const audioContextRef = useRef(null);
   const melodyTimerRef = useRef(null);
 
   useEffect(() => {
+    const clock = window.setInterval(() => setClockNow(Date.now()), 1000);
     setOpened(false);
     setUnlockPassword("");
     setUnlockError("");
@@ -666,6 +675,7 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
       const context = audioContextRef.current;
       audioContextRef.current = null;
       if (context && context.state !== "closed") context.close().catch(() => {});
+      window.clearInterval(clock);
     };
   }, [gift?.slug]);
 
@@ -711,6 +721,14 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
   if (loading) return <main className="view-page section-wrap"><div className="loader"></div><p>بنفتح هديتك...</p></main>;
   if (!gift) return <main className="not-found section-wrap"><span className="not-found-icon">♡</span><h1>الهدية دي مش موجودة</h1><p>ممكن الرابط غلط، أو الهدية محفوظة على جهاز تاني ولسه قاعدة البيانات مش متفعّلة.</p><button className="btn btn-primary" onClick={goHome}>ارجع للرئيسية</button></main>;
   if (gift.expires_at && new Date(`${gift.expires_at}T23:59:59`) < new Date()) return <main className="not-found section-wrap"><span className="not-found-icon">⌛</span><h1>انتهت صلاحية الهدية</h1><p>الرابط ده انتهت صلاحيته حسب التاريخ اللي اختاره صاحب الهدية.</p><button className="btn btn-primary" onClick={goHome}>ارجع للرئيسية</button></main>;
+  if (gift.open_at && Date.parse(gift.open_at) > clockNow) {
+    const remaining = Math.max(0, Math.floor((Date.parse(gift.open_at) - clockNow) / 1000));
+    const days = Math.floor(remaining / 86400);
+    const hours = Math.floor((remaining % 86400) / 3600);
+    const minutes = Math.floor((remaining % 3600) / 60);
+    const seconds = remaining % 60;
+    return <main className="view-page section-wrap surprise-stage"><div className="view-top"><button className="text-link" onClick={goHome}><ChevronRight size={17}/> الرئيسية</button><span><Heart size={14} fill="currentColor"/> لحظتنا</span></div><section className={`surprise-envelope theme-${gift.theme || "rose"}`} style={{background:theme.bg,"--gift-accent":gift.custom_accent || theme.accent,fontFamily:gift.font_family || "Cairo"}}><div className="surprise-sparkles" aria-hidden="true">✦　♡　✦</div><div className="surprise-gift-icon"><Clock3 size={42}/></div><span className="full-kicker">المفاجأة مستنياك</span><h1>لسه شوية يا {gift.to_name} ❤️</h1><p>هدية مخصوصة من {gift.from_name} هتكون جاهزة في الموعد المحدد.</p><div className="reveal-countdown" dir="ltr"><span><b>{days}</b><small>يوم</small></span><span><b>{String(hours).padStart(2,"0")}</b><small>ساعة</small></span><span><b>{String(minutes).padStart(2,"0")}</b><small>دقيقة</small></span><span><b>{String(seconds).padStart(2,"0")}</b><small>ثانية</small></span></div><small>العدّ التنازلي بيتحدّث تلقائيًا.</small></section></main>;
+  }
   const visibleGift = unlockedGift || gift;
   const photos = Array.isArray(visibleGift.photos) ? visibleGift.photos : [];
   const downloadGift = () => {
