@@ -54,3 +54,19 @@
 .payment-pulse{width:9px;height:9px;background:#d45e81;border-radius:50%;box-shadow:0 0 0 5px #fbe5ec;animation:paymentPulse 1.5s infinite}
 @keyframes paymentPulse{50%{box-shadow:0 0 0 9px #fbe5ec}}
 @media(max-width:600px){.payment-wait-card{padding:28px 18px}.payment-wait-card h1{font-size:23px}}
+
+
+/* Manual Orange Cash payment review */
+.wallet-number-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:5px;color:var(--ink)!important;font-size:13px!important}
+.wallet-number-row b{font-size:17px;color:var(--pink)}
+.wallet-number-row .btn{padding:7px 10px;font-size:10px}
+.admin-review-notice{margin:0 0 15px;padding:13px 16px;background:#edf9ef;border:1px solid #ccebd2;border-radius:12px;color:#287342;font-size:12px;overflow-wrap:anywhere}
+.admin-payment-panel{margin:18px 0}
+.admin-payment-list{display:grid;gap:12px}
+.admin-payment-order{border:1px solid #f0e0e5;background:#fffdfd;border-radius:15px;padding:17px}
+.admin-payment-message{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9;font-size:12px;color:#725b64;margin:10px 0}
+.admin-payment-actions{display:flex;gap:9px;flex-wrap:wrap;border-top:1px solid #f3e9eb;padding-top:13px}
+.admin-payment-actions .admin-btn{width:auto;margin:0}
+.admin-approve{background:#e5f7eb;color:#23733d}
+.admin-reject{background:#fff0f0;color:#a52d42}
+@media(max-width:600px){.admin-payment-order{padding:13px}.admin-payment-actions{flex-direction:column}.admin-payment-actions .admin-btn{width:100%}}
