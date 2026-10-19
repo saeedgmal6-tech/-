@@ -301,6 +301,7 @@ function App() {
         setToast(result.error || "تعذر تسجيل طلب الدفع. حاول مرة أخرى.");
         return;
       }
+      setGifts(prev => [{ ...record, owner_token: undefined, payment_status: "awaiting_review", created_at: new Date().toISOString() }, ...prev.filter(item => item.slug !== record.slug)]);
       setPendingPayment(result);
       setSaving(false);
       setPage("manual-payment");
@@ -382,6 +383,7 @@ function App() {
 
   return (
     <div className="app" dir="rtl">
+      <div className="romantic-motion" aria-hidden="true"><span>♡</span><span>✦</span><span>♥</span><span>✧</span><span>♡</span><span>❀</span><span>♥</span><span>✦</span></div>
       <header className="topbar">
         <div className="nav-shell">
           <button className="brand" onClick={goHome} aria-label="لحظتنا الرئيسية">
@@ -774,7 +776,7 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
     if (!ownerToken) return;
     setReplyBusy(true); setReplyStatus("");
     try {
-      const response = await fetch(`/api/track?mode=replies?slug=${encodeURIComponent(gift.slug)}&key=${encodeURIComponent(ownerToken)}`, { cache: "no-store" });
+      const response = await fetch(`/api/track?mode=replies&slug=${encodeURIComponent(gift.slug)}&key=${encodeURIComponent(ownerToken)}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "تعذر تحميل الردود.");
       setOwnerReplies(data.replies || []); setOwnerPanelOpen(true);
@@ -858,6 +860,31 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
 
 function MyGifts({ gifts, openGift, startCreate, setGifts, setToast, copyGiftForEditing }) {
   const [giftUrlInput, setGiftUrlInput] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    async function refreshOwnedGifts() {
+      try {
+        const owners = JSON.parse(localStorage.getItem("lahzetna_owner_tokens") || "{}");
+        const slugs = Object.keys(owners).filter(id => /^[a-z0-9]{6,40}$/i.test(id));
+        const published = await Promise.all(slugs.map(async id => {
+          try {
+            const response = await fetch(`/api/gifts?slug=${encodeURIComponent(id)}`, { cache: "no-store" });
+            const result = await response.json().catch(() => ({}));
+            return response.ok && result.gift ? decodeGiftRecord(result.gift) : null;
+          } catch { return null; }
+        }));
+        if (cancelled) return;
+        const available = published.filter(Boolean);
+        if (available.length) setGifts(prev => {
+          const merged = new Map(prev.map(item => [item.slug, item]));
+          available.forEach(item => merged.set(item.slug, { ...merged.get(item.slug), ...item }));
+          return [...merged.values()].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        });
+      } catch {}
+    }
+    refreshOwnedGifts();
+    return () => { cancelled = true; };
+  }, [setGifts]);
   const [importing, setImporting] = useState(false);
   async function importGift(event) {
     event.preventDefault();
