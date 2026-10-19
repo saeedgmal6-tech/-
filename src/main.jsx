@@ -151,17 +151,42 @@ function App() {
       created_at: new Date().toISOString()
     };
     let persisted = false;
-    if (supabase) {
-      const { data, error } = await supabase.from("gifts").insert(record).select().single();
-      if (!error && data) {
-        setGifts(prev => [data, ...prev.filter(g => g.slug !== data.slug)]);
-        setActiveGift(data);
+    let savedGift = null;
+    let saveError = "";
+    // Save through the server first so every visitor's gift reaches the shared archive,
+    // instead of relying on that visitor's browser localStorage.
+    try {
+      const response = await fetch("/api/gifts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(record)
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.gift) {
+        savedGift = result.gift;
         persisted = true;
       } else {
-        console.error("Supabase save failed:", error);
+        saveError = result.error || "تعذر الحفظ على الموقع.";
+      }
+    } catch {
+      saveError = "تعذر الاتصال بخدمة حفظ الهدايا.";
+    }
+
+    // Compatibility fallback for existing Supabase public insert configuration.
+    if (!persisted && supabase) {
+      const { data, error } = await supabase.from("gifts").insert(record).select().single();
+      if (!error && data) {
+        savedGift = data;
+        persisted = true;
+      } else {
+        console.error("Supabase save failed:", error || saveError);
       }
     }
-    if (!persisted) {
+
+    if (persisted && savedGift) {
+      setGifts(prev => [savedGift, ...prev.filter(g => g.slug !== savedGift.slug)]);
+      setActiveGift(savedGift);
+    } else {
       const localRecord = { ...record, id: record.slug, storage_mode: "local" };
       setGifts(prev => [localRecord, ...prev.filter(g => g.slug !== localRecord.slug)]);
       setActiveGift(localRecord);
@@ -169,7 +194,7 @@ function App() {
     setSaving(false);
     setPage("success");
     window.history.pushState({}, "", `/g/${record.slug}`);
-    if (!persisted) setToast("اتعملت معاينة محفوظة على الجهاز. فعّل Supabase علشان الرابط يفتح عند أي شخص.");
+    if (!persisted) setToast("الهدية محفوظة على جهازك فقط ولم تُضف لأرشيف الموقع. " + (saveError || "راجع اتصال الحفظ."));
   }
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
