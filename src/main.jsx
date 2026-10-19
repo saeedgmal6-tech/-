@@ -355,7 +355,7 @@ function App() {
 
       {page === "home" && <Home gifts={gifts} startCreate={startCreate} openGift={openGift} setPage={setPage} />}
       {page === "how" && <How startCreate={startCreate} />}
-      {page === "create" && <CreatePage form={form} setField={setField} themes={themes} theme={theme} handlePhoto={handlePhoto} handleMediaUpload={handleMediaUpload} createGift={createGift} saving={saving} />
+      {page === "create" && <CreatePage form={form} setField={setField} themes={themes} theme={theme} handlePhoto={handlePhoto} handleMediaUpload={handleMediaUpload} createGift={createGift} saving={saving} />}
       {page === "success" && <Success gift={activeGift} shareUrl={shareUrl} copyLink={copyLink} whatsappShare={whatsappShare} startCreate={startCreate} openGift={() => openGift(activeGift)} />}
       {page === "view" && <GiftView gift={activeGift} theme={giftTheme} loading={giftLoading} goHome={goHome} startCreate={startCreate} />}
       {page === "payment-return" && <PaymentReturn goHome={goHome} />}
