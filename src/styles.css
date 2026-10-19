@@ -174,3 +174,10 @@ body{background:radial-gradient(ellipse at 12% 4%,#fff0f6 0,transparent 30%),rad
 @keyframes romantic-float{0%{transform:translate3d(0,0,0) rotate(-15deg) scale(.8);opacity:0}12%{opacity:.9}50%{transform:translate3d(26px,-55vh,0) rotate(18deg) scale(1.12)}88%{opacity:.65}100%{transform:translate3d(-18px,-115vh,0) rotate(38deg) scale(.9);opacity:0}}
 .app>*:not(.romantic-motion){position:relative;z-index:2}
 @media(prefers-reduced-motion:reduce){.romantic-motion span{animation:none;display:none}}
+
+/* Mobile navigation touch targets and approved-gift sharing */
+@media(max-width:700px){.topbar{z-index:50}.nav-links.open{z-index:60;max-height:calc(100dvh - 70px);overflow-y:auto;padding:14px 18px 22px;overscroll-behavior:contain}.nav-links.open>button{display:flex;align-items:center;justify-content:flex-start;min-height:50px;width:100%;padding:13px 14px;border-radius:12px;font-size:14px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}.nav-links.open>button:not(.nav-cta):active{background:#fff0f4}.nav-links.open .nav-cta{justify-content:center}.menu-toggle{width:44px;height:44px;border-radius:12px;touch-action:manipulation}.builder-form select,.designer-controls select,.message-idea-controls select{min-height:46px;font-size:16px;touch-action:manipulation}}
+.payment-approved-icon{width:68px;height:68px;margin:0 auto 16px;border-radius:24px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,#d64f85,#a62c62);box-shadow:0 12px 28px #b83f6529}
+.approved-share-link{width:100%;overflow-wrap:anywhere;background:#fff5f8;border:1px solid #f0d9e2;border-radius:12px;padding:13px;margin:18px 0;color:#8f3158;font-size:12px;text-align:center}
+.approved-share-button,.approved-open-button{width:100%;margin-top:9px}
+.approved-share-notice{font-size:12px;color:#9b3c62;line-height:1.8}
