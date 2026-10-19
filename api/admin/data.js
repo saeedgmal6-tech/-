@@ -30,13 +30,25 @@ export default async function handler(req, res) {
 
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const [giftsResult, visitCountResult, visits7Result, visitsResult] = await Promise.all([
-    db.from("gifts").select("id,slug,title,from_name,to_name,message,occasion,created_at").order("created_at", { ascending: false }).limit(300),
+  const [visitCountResult, visits7Result, visitsResult] = await Promise.all([
     db.from("site_visits").select("*", { count: "exact", head: true }),
     db.from("site_visits").select("*", { count: "exact", head: true }).gte("created_at", since),
     db.from("site_visits").select("id,path,referrer,created_at").order("created_at", { ascending: false }).limit(300)
   ]);
-  const firstError = giftsResult.error || visitCountResult.error || visits7Result.error || visitsResult.error;
+
+  // Read gifts in pages so the admin dashboard isn't silently capped at the newest 300.
+  const allGifts = [];
+  let giftsError = null;
+  const pageSize = 500;
+  for (let from = 0; ; from += pageSize) {
+    const result = await db.from("gifts").select("*").order("created_at", { ascending: false }).range(from, from + pageSize - 1);
+    if (result.error) { giftsError = result.error; break; }
+    const batch = result.data || [];
+    allGifts.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+
+  const firstError = giftsError || visitCountResult.error || visits7Result.error || visitsResult.error;
   if (firstError) {
     const missingVisits = String(firstError.message || "").toLowerCase().includes("site_visits");
     return res.status(503).json({ error: missingVisits ? "جدول الزيارات لسه مش متجهز. شغّل ملف supabase/admin-analytics.sql في SQL Editor ثم حدّث الصفحة." : "تعذر قراءة بيانات Supabase: " + firstError.message });
@@ -46,8 +58,8 @@ export default async function handler(req, res) {
   for (const visit of visits) counts.set(visit.path, (counts.get(visit.path) || 0) + 1);
   const topPaths = [...counts.entries()].map(([path, count]) => ({ path, count })).sort((a, b) => b.count - a.count).slice(0, 8);
   return res.status(200).json({
-    stats: { totalVisits: visitCountResult.count || 0, visits7d: visits7Result.count || 0, totalGifts: giftsResult.data?.length || 0 },
-    gifts: giftsResult.data || [],
+    stats: { totalVisits: visitCountResult.count || 0, visits7d: visits7Result.count || 0, totalGifts: allGifts.length },
+    gifts: allGifts,
     visits,
     topPaths
   });
