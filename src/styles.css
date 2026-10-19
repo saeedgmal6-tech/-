@@ -159,3 +159,18 @@ body{background:radial-gradient(ellipse at 12% 4%,#fff0f6 0,transparent 30%),rad
 @media(max-width:760px){.hero{grid-template-columns:1fr;padding-top:35px;gap:0}.hero-copy{padding-bottom:0}.hero-art{height:380px;margin-top:8px}.hero-art:before{font-size:155px}.hero-orbit{width:310px;height:310px}.polaroid-front{width:205px;transform:translate(-20px,15px) rotate(-7deg) translateZ(100px)}.polaroid-back{width:180px;transform:translate(52px,-12px) rotate(11deg) translateZ(30px)}.abstract-photo{height:190px}.photo-2{height:160px}.tag-top{right:0;top:24px}.tag-bottom{bottom:20px;left:0}.hero-bottom-note{margin-top:0}.reply-panel-heading{align-items:flex-start}.reply-3d-heart{width:56px;height:56px;border-radius:18px;font-size:37px}.gift-reply-panel{margin-inline:0}.view-bottom-actions{flex-wrap:wrap}.view-bottom-actions .btn{flex:1 1 100%}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 @media print{body{background:#fff!important;color:#222!important}.topbar,.footer,.view-top,.gift-qr-panel,.gift-reply-panel,.view-bottom,.no-print,.toast{display:none!important}.app,.view-page,.section-wrap{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;overflow:visible!important}.full-gift{box-shadow:none!important;border:0!important;background:#fff!important;color:#222!important;break-inside:avoid}.full-gift-inner{max-width:100%!important;padding:12mm!important}.full-cover,.full-gallery img{print-color-adjust:exact;-webkit-print-color-adjust:exact}.full-message{white-space:pre-wrap}.full-gift h1,.full-names,.full-kicker{color:#8d2f5b!important}.gift-timeline-item,.gift-audio-panel,.gift-video-panel{break-inside:avoid}button{display:none!important}a{color:inherit!important;text-decoration:none!important}@page{size:A4;margin:12mm}}
+
+/* Subtle romantic 3D motion decorations */
+.romantic-motion{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:1;isolation:isolate}
+.romantic-motion span{position:absolute;bottom:-12vh;left:var(--x,10%);font-size:var(--size,22px);color:rgba(190,69,105,.19);text-shadow:0 8px 24px rgba(184,63,101,.12);animation:romantic-float var(--duration,18s) linear infinite;animation-delay:var(--delay,0s);transform:translate3d(0,0,0) rotate(-12deg);will-change:transform,opacity}
+.romantic-motion span:nth-child(1){--x:8%;--size:34px;--duration:19s;--delay:-4s}
+.romantic-motion span:nth-child(2){--x:20%;--size:18px;--duration:14s;--delay:-9s;color:rgba(204,157,97,.3)}
+.romantic-motion span:nth-child(3){--x:35%;--size:25px;--duration:22s;--delay:-13s}
+.romantic-motion span:nth-child(4){--x:52%;--size:17px;--duration:16s;--delay:-6s;color:rgba(204,157,97,.27)}
+.romantic-motion span:nth-child(5){--x:68%;--size:31px;--duration:20s;--delay:-11s}
+.romantic-motion span:nth-child(6){--x:79%;--size:26px;--duration:23s;--delay:-2s;color:rgba(190,69,105,.14)}
+.romantic-motion span:nth-child(7){--x:91%;--size:22px;--duration:17s;--delay:-8s}
+.romantic-motion span:nth-child(8){--x:44%;--size:15px;--duration:13s;--delay:-5s;color:rgba(204,157,97,.3)}
+@keyframes romantic-float{0%{transform:translate3d(0,0,0) rotate(-15deg) scale(.8);opacity:0}12%{opacity:.9}50%{transform:translate3d(26px,-55vh,0) rotate(18deg) scale(1.12)}88%{opacity:.65}100%{transform:translate3d(-18px,-115vh,0) rotate(38deg) scale(.9);opacity:0}}
+.app>*:not(.romantic-motion){position:relative;z-index:2}
+@media(prefers-reduced-motion:reduce){.romantic-motion span{animation:none;display:none}}
