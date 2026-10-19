@@ -464,6 +464,7 @@ function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("messages");
+  const [giftSearch, setGiftSearch] = useState("");
 
   async function loadDashboard() {
     setLoading(true);
@@ -518,6 +519,12 @@ function AdminPage() {
   }
 
   const dateText = value => value ? new Date(value).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }) : "—";
+  const filteredGifts = (dashboard?.gifts || []).filter(gift => {
+    const q = giftSearch.trim().toLocaleLowerCase();
+    if (!q) return true;
+    return [gift.title, gift.from_name, gift.to_name, gift.message, gift.occasion, gift.slug]
+      .some(value => String(value || "").toLocaleLowerCase().includes(q));
+  });
 
   return <main className="admin-shell" dir="rtl">
     <div className="admin-top">
@@ -549,11 +556,14 @@ function AdminPage() {
         </div>
         <div className="admin-tabs"><button className={tab==="messages"?"active":""} onClick={()=>setTab("messages")}><MessageCircle size={16}/> الرسائل والهدايا ({dashboard.gifts?.length || 0})</button><button className={tab==="visits"?"active":""} onClick={()=>setTab("visits")}><Eye size={16}/> سجل الزيارات</button></div>
         {tab === "messages" ? <div className="admin-panel">
-          <div className="admin-panel-heading"><div><h2>رسائل الهدايا</h2><p>أحدث الهدايا المحفوظة في قاعدة البيانات.</p></div></div>
-          {!dashboard.gifts?.length ? <div className="admin-empty">لسه مفيش رسائل محفوظة في قاعدة البيانات.</div> : <div className="admin-message-list">{dashboard.gifts.map(gift=><article className="admin-message" key={gift.id || gift.slug}>
+          <div className="admin-panel-heading"><div><h2>كل الهدايا التي أنشأها المستخدمون</h2><p>إجمالي {((dashboard.gifts || []).length).toLocaleString("ar-EG")} هدية محفوظة في قاعدة البيانات، مرتبة من الأحدث للأقدم.</p></div></div>
+          <input className="admin-gift-search" type="search" value={giftSearch} onChange={e=>setGiftSearch(e.target.value)} placeholder="ابحث بالاسم أو عنوان الهدية أو نص الرسالة..." aria-label="البحث في الهدايا"/>
+          {!dashboard.gifts?.length ? <div className="admin-empty">لسه مفيش هدايا محفوظة في قاعدة البيانات. الهدايا التي تُحفظ على جهاز صاحبها فقط لن تظهر هنا.</div> : filteredGifts.length === 0 ? <div className="admin-empty">مفيش هدايا مطابقة للبحث.</div> : <div className="admin-message-list">{filteredGifts.map(gift=><article className="admin-message" key={gift.id || gift.slug}>
+            {gift.cover && <a className="admin-gift-cover-link" href={"/g/"+encodeURIComponent(gift.slug)} target="_blank" rel="noreferrer"><img className="admin-gift-cover" src={gift.cover} alt={"غلاف "+(gift.title || "الهدية")} loading="lazy"/></a>}
             <div className="admin-message-top"><div><strong>{gift.title || "هدية من لحظتنا"}</strong><small>من {gift.from_name} إلى {gift.to_name}</small></div><time>{dateText(gift.created_at)}</time></div>
             <p>{gift.message}</p>
-            <div className="admin-message-bottom"><span>{gift.occasion || "بدون مناسبة"}</span><a href={"/g/"+encodeURIComponent(gift.slug)} target="_blank" rel="noreferrer">فتح الهدية <ExternalLink size={14}/></a></div>
+            <div className="admin-gift-details"><span>المناسبة: {gift.occasion || "بدون مناسبة"}</span><span>الثيم: {gift.theme || "rose"}</span><span>الصور: {Array.isArray(gift.photos) ? gift.photos.length.toLocaleString("ar-EG") : "0"}</span><span>{gift.date ? "التاريخ المميز: "+fmtDate(gift.date) : "بدون تاريخ مميز"}</span><span>{gift.music ? "🎵 موسيقى مفعّلة" : "بدون موسيقى"}</span></div>
+            <div className="admin-message-bottom"><span>رابط الهدية: /g/{gift.slug}</span><a href={"/g/"+encodeURIComponent(gift.slug)} target="_blank" rel="noreferrer">فتح الهدية <ExternalLink size={14}/></a></div>
           </article>)}</div>}
         </div> : <div className="admin-panel">
           <div className="admin-panel-heading"><div><h2>سجل الزيارات</h2><p>مشاهدات الصفحات التي بدأ تسجيلها بعد تفعيل الميزة.</p></div></div>
