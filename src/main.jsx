@@ -36,7 +36,7 @@ function fmtDate(value) {
   try { return new Date(value + "T12:00:00").toLocaleDateString("ar-EG", {year:"numeric",month:"long",day:"numeric"}); } catch { return value; }
 }
 function App() {
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState(() => window.location.pathname === "/admin" ? "admin" : "home");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [gifts, setGifts] = useState(readLocal);
   const [activeGift, setActiveGift] = useState(null);
@@ -54,6 +54,17 @@ function App() {
     if (match) {
       loadGift(match[1]);
     }
+  }, []);
+
+  useEffect(() => {
+    const path = window.location.pathname || "/";
+    if (path === "/admin" || path.startsWith("/api/")) return;
+    fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, referrer: document.referrer || "" }),
+      keepalive: true
+    }).catch(() => {});
   }, []);
 
   useEffect(() => { saveLocal(gifts); }, [gifts]);
@@ -190,6 +201,8 @@ function App() {
   }
 
   const giftTheme = themes.find(t => t.id === (activeGift?.theme || "rose")) || themes[0];
+
+  if (page === "admin") return <AdminPage />;
 
   return (
     <div className="app" dir="rtl">
@@ -434,6 +447,118 @@ function MyGifts({ gifts, openGift, startCreate, setGifts, setToast }) {
     <div className="page-intro"><span className="eyebrow"><Heart size={15}/> ذكرياتك</span><h1>هدايا <span>لحظتنا</span></h1><p>كل هدية عملتها هتلاقيها هنا على الجهاز ده.</p></div>
     {gifts.length===0 ? <div className="empty-state"><span className="empty-heart"><Gift size={34}/></span><h2>لسه مفيش هدايا</h2><p>أول هدية ممكن تكون بداية ذكرى جميلة.</p><button className="btn btn-primary" onClick={startCreate}>اصنع أول هدية <ArrowLeft size={17}/></button></div> :
       <div className="gifts-grid">{gifts.map(g=><div className="gift-list-card" key={g.slug}><button className={`gift-list-cover cover-${g.theme||"rose"}`} onClick={()=>openGift(g)}>{g.cover?<img src={g.cover} alt=""/>:<Heart size={40} fill="currentColor"/>}<span>{(themes.find(t=>t.id===g.theme)||themes[0]).emoji}</span></button><div className="gift-list-body"><small>إلى {g.to_name}</small><h3>{g.title||`هدية إلى ${g.to_name}`}</h3><p>{g.message?.slice(0,90)}{(g.message||"").length>90?"…":""}</p><div className="gift-list-actions"><button onClick={()=>openGift(g)}><Eye size={15}/> عرض</button><button onClick={()=>{navigator.clipboard?.writeText(`${window.location.origin}/g/${g.slug}`).then(()=>setToast("تم نسخ الرابط")).catch(()=>window.prompt("انسخ الرابط",`${window.location.origin}/g/${g.slug}`));}}><Copy size={15}/> نسخ الرابط</button><button className="delete-action" onClick={()=>removeGift(g)} aria-label="حذف"><Trash2 size={15}/></button></div></div></div>)}</div>}
+  </main>;
+}
+
+
+function AdminPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [authenticated, setAuthenticated] = useState(false);
+  const [dashboard, setDashboard] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [tab, setTab] = useState("messages");
+
+  async function loadDashboard() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/data", { credentials: "same-origin" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 401) setAuthenticated(false);
+        throw new Error(data.error || "تعذر تحميل لوحة التحكم.");
+      }
+      setDashboard(data);
+      setAuthenticated(true);
+    } catch (err) {
+      setError(err.message || "في مشكلة في الاتصال.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadDashboard(); }, []);
+
+  async function login(event) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "اسم المستخدم أو كلمة المرور غير صحيحة.");
+      setAuthenticated(true);
+      setPassword("");
+      await loadDashboard();
+    } catch (err) {
+      setError(err.message || "فشل تسجيل الدخول.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function logout() {
+    await fetch("/api/admin/data", { method: "POST", credentials: "same-origin" }).catch(() => {});
+    setAuthenticated(false);
+    setDashboard(null);
+    setUsername("");
+    setPassword("");
+  }
+
+  const dateText = value => value ? new Date(value).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }) : "—";
+
+  return <main className="admin-shell" dir="rtl">
+    <div className="admin-top">
+      <a href="/" className="admin-brand"><span className="admin-brand-icon"><Heart size={22} fill="currentColor"/></span><span><strong>لحظتنا</strong><small>لوحة الإدارة</small></span></a>
+      {authenticated && <div className="admin-top-actions"><button className="admin-btn admin-btn-ghost" onClick={loadDashboard} disabled={loading}><Clock3 size={16}/> تحديث</button><button className="admin-btn admin-btn-ghost" onClick={logout}>تسجيل الخروج</button></div>}
+    </div>
+
+    {!authenticated ? <section className="admin-login-card">
+      <div className="admin-login-icon"><LockKeyhole size={28}/></div>
+      <span className="admin-eyebrow">ADMIN ACCESS</span>
+      <h1>أهلًا بيك في لوحة الإدارة</h1>
+      <p>سجّل دخولك لمراجعة رسائل الهدايا وإحصائيات الزيارات.</p>
+      <form onSubmit={login} className="admin-login-form">
+        <label>اسم المستخدم<input autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} required placeholder="Username"/></label>
+        <label>كلمة المرور<input autoComplete="current-password" type="password" value={password} onChange={e=>setPassword(e.target.value)} required placeholder="Password"/></label>
+        {error && <div className="admin-error">{error}</div>}
+        <button className="admin-btn admin-btn-primary" type="submit" disabled={loading}>{loading ? "جارٍ تسجيل الدخول..." : "دخول لوحة الإدارة"} <ArrowLeft size={17}/></button>
+      </form>
+      <a href="/" className="admin-back-link"><ArrowUpLeft size={15}/> الرجوع للموقع</a>
+    </section> : <section className="admin-content">
+      <div className="admin-heading"><div><span className="admin-eyebrow">OVERVIEW</span><h1>لوحة التحكم</h1><p>ملخص الهدايا والزيارات المسجلة على الموقع.</p></div><span className="admin-live"><i/> متصل</span></div>
+      {error && <div className="admin-error admin-wide-error">{error}</div>}
+      {dashboard && <>
+        <div className="admin-stats">
+          <article className="admin-stat"><span className="admin-stat-icon"><Eye size={19}/></span><small>إجمالي مشاهدات الصفحات</small><strong>{(dashboard.stats?.totalVisits || 0).toLocaleString("ar-EG")}</strong></article>
+          <article className="admin-stat"><span className="admin-stat-icon"><Clock3 size={19}/></span><small>زيارات آخر 7 أيام</small><strong>{(dashboard.stats?.visits7d || 0).toLocaleString("ar-EG")}</strong></article>
+          <article className="admin-stat"><span className="admin-stat-icon"><Gift size={19}/></span><small>إجمالي الهدايا</small><strong>{(dashboard.stats?.totalGifts || 0).toLocaleString("ar-EG")}</strong></article>
+          <article className="admin-stat"><span className="admin-stat-icon"><MessageCircle size={19}/></span><small>رسائل محفوظة</small><strong>{(dashboard.stats?.totalGifts || 0).toLocaleString("ar-EG")}</strong></article>
+        </div>
+        <div className="admin-tabs"><button className={tab==="messages"?"active":""} onClick={()=>setTab("messages")}><MessageCircle size={16}/> الرسائل والهدايا ({dashboard.gifts?.length || 0})</button><button className={tab==="visits"?"active":""} onClick={()=>setTab("visits")}><Eye size={16}/> سجل الزيارات</button></div>
+        {tab === "messages" ? <div className="admin-panel">
+          <div className="admin-panel-heading"><div><h2>رسائل الهدايا</h2><p>أحدث الهدايا المحفوظة في قاعدة البيانات.</p></div></div>
+          {!dashboard.gifts?.length ? <div className="admin-empty">لسه مفيش رسائل محفوظة في قاعدة البيانات.</div> : <div className="admin-message-list">{dashboard.gifts.map(gift=><article className="admin-message" key={gift.id || gift.slug}>
+            <div className="admin-message-top"><div><strong>{gift.title || "هدية من لحظتنا"}</strong><small>من {gift.from_name} إلى {gift.to_name}</small></div><time>{dateText(gift.created_at)}</time></div>
+            <p>{gift.message}</p>
+            <div className="admin-message-bottom"><span>{gift.occasion || "بدون مناسبة"}</span><a href={"/g/"+encodeURIComponent(gift.slug)} target="_blank" rel="noreferrer">فتح الهدية <ExternalLink size={14}/></a></div>
+          </article>)}</div>}
+        </div> : <div className="admin-panel">
+          <div className="admin-panel-heading"><div><h2>سجل الزيارات</h2><p>مشاهدات الصفحات التي بدأ تسجيلها بعد تفعيل الميزة.</p></div></div>
+          {!dashboard.visits?.length ? <div className="admin-empty">لم تُسجل زيارات بعد. افتح الصفحة الرئيسية في تبويب جديد لتجربة التتبع.</div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>وقت الزيارة</th><th>الصفحة</th><th>المصدر</th></tr></thead><tbody>{dashboard.visits.map(v=><tr key={v.id}><td>{dateText(v.created_at)}</td><td dir="ltr">{v.path}</td><td>{v.referrer ? <span dir="ltr">{v.referrer}</span> : "مباشر"}</td></tr>)}</tbody></table></div>}
+          {dashboard.topPaths?.length > 0 && <div className="admin-top-paths"><h3>أكثر الصفحات مشاهدة</h3>{dashboard.topPaths.map(item=><div key={item.path}><span dir="ltr">{item.path}</span><strong>{item.count.toLocaleString("ar-EG")}</strong></div>)}</div>}
+        </div>}
+        <p className="admin-footnote">الإحصائيات دي بتبدأ من وقت تفعيل تسجيل الزيارات، ومش بتسترجع زيارات قديمة.</p>
+      </>}
+      {loading && <div className="admin-loading">جارٍ تحديث البيانات…</div>}
+    </section>}
   </main>;
 }
 
