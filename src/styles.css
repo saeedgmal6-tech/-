@@ -251,3 +251,6 @@ body{background:radial-gradient(ellipse at 12% 4%,#fff0f6 0,transparent 30%),rad
   .hero h1{font-size:35px!important;line-height:1.34!important}
   .hero-art{height:300px!important;min-height:280px!important}
 }
+
+/* Mobile dropdown layout fix */
+@media(max-width:700px){.topbar{position:relative!important;overflow:visible!important}.nav-shell{height:auto!important;min-height:70px!important;display:flex!important;flex-wrap:wrap!important}.nav-shell>.brand{order:1}.nav-shell>.menu-toggle{order:2;margin-inline-start:auto!important}.nav-shell>.nav-links.open{position:static!important;inset:auto!important;order:3!important;flex:0 0 100%!important;width:100%!important;max-width:100%!important;max-height:65dvh!important;display:flex!important;overflow-y:auto!important;transform:none!important;box-shadow:none!important;border:0!important;border-top:1px solid #f0dce8!important;padding:12px 0 18px!important;background:#fffafc!important}.hero{z-index:1!important}}
