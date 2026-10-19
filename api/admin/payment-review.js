@@ -42,20 +42,23 @@ export default async function handler(req, res) {
 
   const giftToPublish = { ...order.gift, created_at: new Date().toISOString() };
   let { error: giftError } = await db.from("gifts").insert(giftToPublish);
-  // Older production databases may still have the original four-theme constraint.
-  // Retry only when that exact constraint blocks a newer theme; preserve all other gift fields.
+  // Some existing Supabase projects still have an older four-theme constraint.
+  // If the theme check rejects a newer theme, retry with a compatible known theme.
   if (giftError && giftError.code === "23514" && String(giftError.message || "").includes("gifts_theme_check")) {
-    const compatibleTheme = {
+    const preferredTheme = {
       sunset: "rose",
       lavender: "cream",
       ocean: "garden",
       midnight: "night"
-    };
-    const fallbackTheme = compatibleTheme[giftToPublish.theme];
-    if (fallbackTheme) {
-      giftToPublish.theme = fallbackTheme;
+    }[giftToPublish.theme];
+    const compatibleThemes = [preferredTheme, "rose", "night", "cream", "garden"]
+      .filter((theme, index, all) => theme && all.indexOf(theme) === index);
+    for (const theme of compatibleThemes) {
+      giftToPublish.theme = theme;
       const retry = await db.from("gifts").insert(giftToPublish);
       giftError = retry.error;
+      if (!giftError || giftError.code === "23505" || giftError.code !== "23514" ||
+          !String(giftError.message || "").includes("gifts_theme_check")) break;
     }
   }
   if (giftError && giftError.code !== "23505") {
