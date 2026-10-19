@@ -252,6 +252,7 @@ function App() {
     }
     if (form.password && form.password.length < 4) { setToast("كلمة مرور الهدية لازم تكون 4 أحرف على الأقل."); return; }
     setSaving(true);
+    const ownerToken = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("");
     const privatePayload = { message: form.message.trim(), photos: form.photos.map(p => p.data), cover: form.cover || form.photos[0]?.data || "", audio_url: form.audioUrl || "", audio_name: form.audioName || "", video_url: form.videoUrl || "", timeline: Array.isArray(form.timeline) ? form.timeline.slice(0, 6) : [] };
     let securePayload = null;
     try { if (form.password) securePayload = await encryptGiftPayload(privatePayload, form.password); }
@@ -277,8 +278,15 @@ function App() {
       custom_accent: form.customAccent || "",
       font_family: form.fontFamily || "Cairo",
       locked: !!form.password,
-      secure_payload: securePayload
+      secure_payload: securePayload,
+      owner_token: ownerToken
     };
+    try {
+      const owners = JSON.parse(localStorage.getItem("lahzetna_owner_tokens") || "{}");
+      owners[record.slug] = ownerToken;
+      localStorage.setItem("lahzetna_owner_tokens", JSON.stringify(owners));
+    } catch {}
+    fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "payment_submitted" }) }).catch(() => {});
     try {
       const response = await fetch("/api/payments/create", {
         method: "POST",
@@ -315,12 +323,14 @@ function App() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   }
   function openGift(gift) {
+    fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "gift_view", slug: gift?.slug }) }).catch(() => {});
     setActiveGift(gift);
     setPage("view");
     window.history.pushState({}, "", `/g/${gift.slug}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function startCreate() {
+    fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "gift_start" }) }).catch(() => {});
     setActiveGift(null);
     setPage("create");
     window.history.pushState({}, "", "/");
@@ -679,6 +689,13 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
   const [unlockedGift, setUnlockedGift] = useState(null);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [clockNow, setClockNow] = useState(Date.now());
+  const [ownerToken, setOwnerToken] = useState("");
+  const [replyText, setReplyText] = useState("");
+  const [replyReaction, setReplyReaction] = useState("❤️");
+  const [replyStatus, setReplyStatus] = useState("");
+  const [ownerReplies, setOwnerReplies] = useState([]);
+  const [ownerPanelOpen, setOwnerPanelOpen] = useState(false);
+  const [replyBusy, setReplyBusy] = useState(false);
   const audioContextRef = useRef(null);
   const melodyTimerRef = useRef(null);
 
@@ -689,6 +706,8 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
     setUnlockError("");
     setUnlockedGift(null);
     setMusicPlaying(false);
+    setReplyStatus(""); setOwnerReplies([]); setOwnerPanelOpen(false);
+    try { const owners = JSON.parse(localStorage.getItem("lahzetna_owner_tokens") || "{}"); setOwnerToken(owners[gift?.slug] || ""); } catch { setOwnerToken(""); }
     return () => {
       if (melodyTimerRef.current) window.clearInterval(melodyTimerRef.current);
       melodyTimerRef.current = null;
@@ -736,6 +755,29 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
     playNote();
     melodyTimerRef.current = window.setInterval(playNote, 650);
     setMusicPlaying(true);
+  }
+
+  async function submitGiftReply(event) {
+    event.preventDefault(); setReplyBusy(true); setReplyStatus("");
+    try {
+      const response = await fetch("/api/replies", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: gift.slug, reaction: replyReaction, message: replyText.trim() }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "تعذر إرسال ردك.");
+      setReplyText(""); setReplyStatus("وصل ردك لصاحب الهدية ❤️");
+      fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "reply_submitted", slug: gift.slug }) }).catch(() => {});
+    } catch (error) { setReplyStatus(error.message || "حصلت مشكلة في إرسال الرد."); }
+    finally { setReplyBusy(false); }
+  }
+  async function loadOwnerReplies() {
+    if (!ownerToken) return;
+    setReplyBusy(true); setReplyStatus("");
+    try {
+      const response = await fetch(`/api/replies?slug=${encodeURIComponent(gift.slug)}&key=${encodeURIComponent(ownerToken)}`, { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "تعذر تحميل الردود.");
+      setOwnerReplies(data.replies || []); setOwnerPanelOpen(true);
+    } catch (error) { setReplyStatus(error.message || "تعذر تحميل الردود."); }
+    finally { setReplyBusy(false); }
   }
 
   if (loading) return <main className="view-page section-wrap"><div className="loader"></div><p>بنفتح هديتك...</p></main>;
@@ -796,7 +838,19 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
       <div><span className="eyebrow"><Share2 size={14}/> خَلّي اللحظة أقرب</span><h2>شارك الهدية برمز QR</h2><p>امسح الرمز بكاميرا الموبايل لفتح رابط الهدية مباشرة.</p></div>
       <img src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(window.location.href)}`} alt="رمز QR لفتح الهدية" loading="lazy"/>
     </section>
-    <div className="view-bottom"><p>كل لحظة حلوة تستاهل تتفتكر.</p><div className="view-bottom-actions"><button className="btn btn-outline" onClick={downloadGift}><Upload size={16}/> احفظ الرسالة كملف</button><button className="btn btn-primary" onClick={startCreate}>اصنع هدية زي دي <ArrowLeft size={17}/></button></div></div>
+    <section className="gift-reply-panel no-print">
+      <div className="reply-panel-heading"><span className="reply-3d-heart" aria-hidden="true">♥</span><div><span className="eyebrow">كلمة راجعة من القلب</span><h2>سيب لصاحب الهدية ردّك ❤️</h2><p>اختار إحساسك واكتب رسالة قصيرة لو حابب.</p></div></div>
+      <form onSubmit={submitGiftReply} className="gift-reply-form">
+        <div className="reply-reactions" role="group" aria-label="اختار رد الفعل">{["❤️","🥹","😍","🤍","🫶","💌"].map(item=><button key={item} type="button" className={replyReaction===item?"selected":""} onClick={()=>setReplyReaction(item)} aria-pressed={replyReaction===item}>{item}</button>)}</div>
+        <label className="reply-message-label">رسالتك (اختياري)<textarea value={replyText} onChange={e=>setReplyText(e.target.value)} maxLength={500} rows={3} placeholder="الهدية فرحتني عشان..."/></label>
+        <button className="btn btn-primary" type="submit" disabled={replyBusy}>{replyBusy?"جاري الإرسال...":"ابعت ردك"} <Heart size={16} fill="currentColor"/></button>
+        {replyStatus && <p className="reply-status" role="status">{replyStatus}</p>}
+      </form>
+      {ownerToken && <div className="owner-replies-area"><button className="btn btn-outline" type="button" onClick={loadOwnerReplies} disabled={replyBusy}><MessageCircle size={16}/> {ownerPanelOpen?"تحديث ردود هديتك":"شوف الردود اللي وصلتك"}</button>
+        {ownerPanelOpen && <div className="owner-replies-list">{!ownerReplies.length?<p>لسه مفيش ردود على الهدية دي.</p>:ownerReplies.map(reply=><article key={reply.id}><div><strong>{reply.reaction || "❤️"}</strong><time>{new Date(reply.created_at).toLocaleString("ar-EG",{dateStyle:"medium",timeStyle:"short"})}</time></div><p>{reply.message || "رد فعل من غير رسالة مكتوبة."}</p></article>)}</div>}
+      </div>}
+    </section>
+    <div className="view-bottom no-print"><p>كل لحظة حلوة تستاهل تتفتكر.</p><div className="view-bottom-actions"><button className="btn btn-outline" onClick={downloadGift}><Upload size={16}/> احفظ الرسالة كملف نصي</button><button className="btn btn-outline" onClick={() => window.print()}><Download size={16}/> تنزيل PDF / طباعة</button><button className="btn btn-primary" onClick={startCreate}>اصنع هدية زي دي <ArrowLeft size={17}/></button></div></div>
   </main>;
 }
 
