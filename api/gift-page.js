@@ -7,7 +7,7 @@ const meta = (html, selector, value) => {
   const escaped = esc(value);
   const pattern = new RegExp('<meta\\s+' + tag + '="' + name + '"[^>]*>', "i");
   const replacement = '<meta ' + tag + '="' + name + '" content="' + escaped + '" />';
-  return pattern.test(html) ? html.replace(pattern, replacement) : html.replace("</head>", "    " + replacement + "\\n  </head>");
+  return pattern.test(html) ? html.replace(pattern, replacement) : html.replace("</head>", "    " + replacement + "\n  </head>");
 };
 
 export default async function handler(req, res) {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
       if (data) {
         title = data.title || ("هدية إلى " + (data.to_name || "شخص مميز"));
         description = "هدية مخصوصة من " + (data.from_name || "شخص بيحبك") + " إلى " + (data.to_name || "شخص مميز") + " ❤️";
-        if (data.cover && /^https:\\/\\//i.test(data.cover)) imageUrl = data.cover;
+        if (typeof data.cover === "string" && data.cover.startsWith("https://")) imageUrl = data.cover;
       }
     } catch (error) { console.error("Gift preview metadata lookup failed:", error?.message || error); }
   }
