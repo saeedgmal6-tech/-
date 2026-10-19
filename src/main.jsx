@@ -40,11 +40,12 @@ function App() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [gifts, setGifts] = useState(readLocal);
   const [activeGift, setActiveGift] = useState(null);
+  const [pendingPayment, setPendingPayment] = useState(null);
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "حكايتنا لسه مكملة", fromName: "", toName: "", message: "في وسط كل الأيام العادية، إنت أجمل حاجة حصلتلي. كل لحظة معاك بتستاهل تتحكي، وكل ذكرى بينا ليها مكان خاص في قلبي. ❤️",
-    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, payerPhone: ""
+    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, payerPhone: "", transferReference: ""
   });
   const [giftLoading, setGiftLoading] = useState(false);
 
@@ -180,7 +181,11 @@ function App() {
       return;
     }
     if (!/^(?:\+?20)?0?1[0125][0-9]{8}$/.test(String(form.payerPhone || "").replace(/[\s()-]/g, ""))) {
-      setToast("اكتب رقم موبايل مصري صحيح علشان تكمل الدفع بالمحفظة.");
+      setToast("اكتب رقم موبايل مصري صحيح علشان نراجع التحويل.");
+      return;
+    }
+    if (String(form.transferReference || "").trim().length < 4) {
+      setToast("اكتب رقم العملية الظاهر في رسالة تحويل أورنج كاش.");
       return;
     }
     setSaving(true);
@@ -201,16 +206,17 @@ function App() {
       const response = await fetch("/api/payments/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gift: record, phone: form.payerPhone })
+        body: JSON.stringify({ gift: record, phone: form.payerPhone, reference: form.transferReference })
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result.checkoutUrl) {
+      if (!response.ok || !result.orderId) {
         setSaving(false);
-        setToast(result.error || "تعذر بدء الدفع. حاول مرة أخرى.");
+        setToast(result.error || "تعذر تسجيل طلب الدفع. حاول مرة أخرى.");
         return;
       }
-      // The gift is not published or shown as successful until the signed Paymob webhook confirms payment.
-      window.location.assign(result.checkoutUrl);
+      setPendingPayment(result);
+      setSaving(false);
+      setPage("manual-payment");
     } catch {
       setSaving(false);
       setToast("تعذر الاتصال ببوابة الدفع. تحقق من الإنترنت وحاول مرة أخرى.");
@@ -278,6 +284,7 @@ function App() {
       {page === "success" && <Success gift={activeGift} shareUrl={shareUrl} copyLink={copyLink} whatsappShare={whatsappShare} startCreate={startCreate} openGift={() => openGift(activeGift)} />}
       {page === "view" && <GiftView gift={activeGift} theme={giftTheme} loading={giftLoading} goHome={goHome} startCreate={startCreate} />}
       {page === "payment-return" && <PaymentReturn goHome={goHome} />}
+      {page === "manual-payment" && <ManualPaymentPage pendingPayment={pendingPayment} goHome={goHome} />}
       {page === "mygifts" && <MyGifts gifts={gifts} openGift={openGift} startCreate={startCreate} setGifts={setGifts} setToast={setToast} />}
       <footer className="footer">
         <div className="footer-inner">
@@ -370,6 +377,22 @@ function How({ startCreate }) {
   </main>;
 }
 
+function WalletNumber() {
+  const [walletNumber, setWalletNumber] = useState("");
+  const [walletError, setWalletError] = useState("");
+  useEffect(() => {
+    fetch("/api/payments/config", { cache: "no-store" })
+      .then(async response => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || "رقم المحفظة غير متاح حاليًا.");
+        setWalletNumber(data.walletNumber || "");
+      })
+      .catch(error => setWalletError(error.message || "تعذر تحميل رقم المحفظة."));
+  }, []);
+  if (walletNumber) return <span className="wallet-number-row">حوّل إلى: <b dir="ltr">{walletNumber}</b> <button type="button" className="btn btn-outline" onClick={() => navigator.clipboard?.writeText(walletNumber)}>نسخ الرقم</button></span>;
+  return <span>{walletError || "جاري تحميل رقم محفظة الاستقبال..."}</span>;
+}
+
 function CreatePage({ form, setField, themes, theme, handlePhoto, createGift, saving }) {
   const [preview, setPreview] = useState(false);
   const [messageStyle, setMessageStyle] = useState("romantic");
@@ -388,8 +411,9 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, createGift, sa
           <div className="form-section-title"><span className="form-icon"><Heart size={19}/></span><div><h2>الحكاية بتبدأ بمين؟</h2><p>خلينا نعرف الهدية لمين ومن مين.</p></div></div>
           <label>عنوان الهدية<input value={form.title} onChange={e=>setField("title",e.target.value)} placeholder="مثلاً: حكايتنا لسه مكملة" maxLength={90}/></label>
           <div className="field-grid"><label>اسمك<input value={form.fromName} onChange={e=>setField("fromName",e.target.value)} placeholder="اسمك" required maxLength={60}/></label><label>اسم الشخص<input value={form.toName} onChange={e=>setField("toName",e.target.value)} placeholder="اسم حبيبك" required maxLength={60}/></label></div>
-          <label>رقم موبايلك للدفع بالمحفظة<input type="tel" inputMode="tel" autoComplete="tel" value={form.payerPhone || ""} onChange={e=>setField("payerPhone",e.target.value)} placeholder="01xxxxxxxxx" required maxLength={15}/><span className="optional">سيُستخدم لإتمام الدفع عبر بوابة الدفع فقط.</span></label>
-          <div className="payment-price-note"><span>سعر إنشاء الهدية</span><strong>20 جنيه مصري</strong><small>الدفع آمن عبر بوابة إلكترونية، ولن يتم نشر الهدية إلا بعد تأكيد الدفع.</small></div>
+          <div className="payment-price-note"><span>سعر إنشاء الهدية</span><strong>20 جنيه مصري</strong><small>حوّل المبلغ إلى رقم أورنج كاش الموضح أدناه أولًا، ثم اكتب بيانات التحويل. لن تُنشر الهدية إلا بعد مراجعة الدفع والموافقة عليه.</small><WalletNumber /></div>
+          <label>رقم الموبايل اللي حوّلت منه<input type="tel" inputMode="tel" autoComplete="tel" value={form.payerPhone || ""} onChange={e=>setField("payerPhone",e.target.value)} placeholder="01xxxxxxxxx" required maxLength={15}/><span className="optional">رقم المحفظة التي أرسلت منها مبلغ الـ20 جنيه.</span></label>
+          <label>رقم العملية / مرجع التحويل<input type="text" value={form.transferReference || ""} onChange={e=>setField("transferReference",e.target.value)} placeholder="اكتب رقم العملية من رسالة أورنج كاش" required maxLength={100}/><span className="optional">اكتب رقم العملية كما ظهر في رسالة تأكيد التحويل.</span></label>
           <label>المناسبة<select value={form.occasion} onChange={e=>setField("occasion",e.target.value)}>{occasions.map(o=><option key={o}>{o}</option>)}</select></label>
           <label>التاريخ المميز <span className="optional">(اختياري)</span><div className="input-icon"><CalendarDays size={18}/><input type="date" value={form.date} onChange={e=>setField("date",e.target.value)}/></div></label>
         </div>
@@ -430,9 +454,49 @@ function PaymentReturn({ goHome }) {
     <div className="payment-wait-card">
       <div className="payment-wait-icon"><Clock3 size={30}/></div>
       <span className="eyebrow">لحظتنا · تأكيد الدفع</span>
-      <h1>بنتأكد من الدفع...</h1>
-      <p>هننشر هديتك أول ما بوابة الدفع تأكد نجاح العملية. من فضلك ما تقفلش الصفحة.</p>
-      <div className="payment-wait-status"><span className="payment-pulse"></span> جاري انتظار التأكيد الآمن</div>
+      <h1>حالة الدفع</h1>
+      <p>لو وصلت هنا من رابط قديم، افتح الموقع وراجع حالة طلبك من جديد.</p>
+      <button className="btn btn-outline" onClick={goHome}>العودة للرئيسية</button>
+    </div>
+  </main>;
+}
+
+function ManualPaymentPage({ pendingPayment, goHome }) {
+  const [status, setStatus] = useState("awaiting_review");
+  useEffect(() => {
+    if (!pendingPayment?.slug) return;
+    let stopped = false;
+    const check = async () => {
+      try {
+        const response = await fetch("/api/payments/status?slug=" + encodeURIComponent(pendingPayment.slug), { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (stopped) return;
+        if (response.ok && data.status === "approved" && data.gift) {
+          stopped = true;
+          window.location.assign("/g/" + encodeURIComponent(data.gift.slug));
+          return;
+        }
+        if (data.status === "rejected") { setStatus("rejected"); stopped = true; }
+      } catch {}
+    };
+    check();
+    const timer = setInterval(check, 7000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [pendingPayment?.slug]);
+  return <main className="section-wrap payment-return-page">
+    <div className="payment-wait-card">
+      <div className="payment-wait-icon"><Clock3 size={30}/></div>
+      <span className="eyebrow">لحظتنا · مراجعة التحويل</span>
+      {status === "rejected" ? <>
+        <h1>الطلب مرفوض</h1>
+        <p>لم يتم اعتماد التحويل. راجع رقم العملية أو تواصل مع إدارة الموقع قبل إرسال طلب جديد.</p>
+      </> : <>
+        <h1>طلبك وصل للمراجعة</h1>
+        <p>طلب إنشاء الهدية اتسجل، وهيتم مراجعته يدويًا. الهدية مش هتتنشر قبل الموافقة.</p>
+        <div className="payment-wait-status"><span className="payment-pulse"></span> في انتظار مراجعة الدفع</div>
+        {pendingPayment?.orderId && <p>رقم الطلب: <b dir="ltr">{pendingPayment.orderId}</b></p>}
+        {pendingPayment?.walletNumber && <p>محفظة الاستقبال: <b dir="ltr">{pendingPayment.walletNumber}</b></p>}
+      </>}
       <button className="btn btn-outline" onClick={goHome}>العودة للرئيسية</button>
     </div>
   </main>;
