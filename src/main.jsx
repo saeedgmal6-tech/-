@@ -535,6 +535,62 @@ function Success({ gift, shareUrl, copyLink, whatsappShare, startCreate, openGif
 }
 
 function GiftView({ gift, theme, loading, goHome, startCreate }) {
+  const [opened, setOpened] = useState(false);
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const audioContextRef = useRef(null);
+  const melodyTimerRef = useRef(null);
+
+  useEffect(() => {
+    setOpened(false);
+    setMusicPlaying(false);
+    return () => {
+      if (melodyTimerRef.current) window.clearInterval(melodyTimerRef.current);
+      melodyTimerRef.current = null;
+      const context = audioContextRef.current;
+      audioContextRef.current = null;
+      if (context && context.state !== "closed") context.close().catch(() => {});
+    };
+  }, [gift?.slug]);
+
+  function toggleMelody() {
+    if (musicPlaying) {
+      if (melodyTimerRef.current) window.clearInterval(melodyTimerRef.current);
+      melodyTimerRef.current = null;
+      const context = audioContextRef.current;
+      audioContextRef.current = null;
+      if (context && context.state !== "closed") context.close().catch(() => {});
+      setMusicPlaying(false);
+      return;
+    }
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      window.alert("المتصفح لا يدعم تشغيل اللحن.");
+      return;
+    }
+    const context = new AudioContextClass();
+    audioContextRef.current = context;
+    const notes = [523.25, 659.25, 783.99, 659.25, 587.33, 659.25, 523.25, 392.00];
+    let index = 0;
+    const playNote = () => {
+      if (context.state === "closed") return;
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = notes[index % notes.length];
+      gain.gain.setValueAtTime(0.0001, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.045, context.currentTime + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.52);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.55);
+      index += 1;
+    };
+    playNote();
+    melodyTimerRef.current = window.setInterval(playNote, 650);
+    setMusicPlaying(true);
+  }
+
   if (loading) return <main className="view-page section-wrap"><div className="loader"></div><p>بنفتح هديتك...</p></main>;
   if (!gift) return <main className="not-found section-wrap"><span className="not-found-icon">♡</span><h1>الهدية دي مش موجودة</h1><p>ممكن الرابط غلط، أو الهدية محفوظة على جهاز تاني ولسه قاعدة البيانات مش متفعّلة.</p><button className="btn btn-primary" onClick={goHome}>ارجع للرئيسية</button></main>;
   const photos = Array.isArray(gift.photos) ? gift.photos : [];
@@ -545,6 +601,19 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
     const a = document.createElement("a"); a.href = url; a.download = "lahzetna-gift.txt"; a.click();
     URL.revokeObjectURL(url);
   };
+  if (!opened) return <main className="view-page section-wrap surprise-stage">
+    <div className="view-top"><button className="text-link" onClick={goHome}><ChevronRight size={17}/> الرئيسية</button><span><Heart size={14} fill="currentColor"/> لحظتنا</span></div>
+    <section className={`surprise-envelope theme-${gift.theme || "rose"}`} style={{background:theme.bg,"--gift-accent":theme.accent}}>
+      <div className="surprise-sparkles" aria-hidden="true">✦　♡　✦</div>
+      <div className="surprise-gift-icon"><Gift size={44}/></div>
+      <span className="full-kicker">{gift.occasion || "هدية من القلب"}</span>
+      <h1>فيه مفاجأة <span>{gift.to_name}</span> ❤️</h1>
+      <p>رسالة مخصوصة من {gift.from_name}، اتعملت بكل حب علشان لحظتكم تبقى ذكرى.</p>
+      <button className="surprise-open-btn" onClick={() => setOpened(true)}><Gift size={19}/> افتح مفاجأتك <Heart size={17} fill="currentColor"/></button>
+      <small>اضغط وافتح رسالتك الخاصة</small>
+    </section>
+  </main>;
+
   return <main className="view-page section-wrap">
     <div className="view-top"><button className="text-link" onClick={goHome}><ChevronRight size={17}/> الرئيسية</button><span><Heart size={14} fill="currentColor"/> لحظتنا</span></div>
     <article className={`full-gift full-${gift.theme||"rose"}`} style={{background:theme.bg,"--gift-accent":theme.accent}}>
@@ -558,10 +627,14 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
         <div className="full-message">{gift.message}</div>
         {gift.date && <div className="full-date"><CalendarDays size={16}/>{fmtDate(gift.date)}</div>}
         {photos.length > 1 && <div className="full-gallery">{photos.slice(0,5).map((p,i)=><img key={i} src={typeof p==="string"?p:p.data} alt={`ذكرى ${i+1}`}/>)}</div>}
-        {gift.music && <div className="preview-music"><Music2 size={14}/> لمسة موسيقية</div>}
+        {gift.music && <button type="button" className="preview-music melody-toggle" onClick={toggleMelody}><Music2 size={14}/> {musicPlaying ? "إيقاف اللحن" : "شغّل لحن هادئ"} {musicPlaying ? "Ⅱ" : "♫"}</button>}
         <div className="full-signature">اتعملت بكل حب <Heart size={14} fill="currentColor"/></div>
       </div>
     </article>
+    <section className="gift-qr-panel">
+      <div><span className="eyebrow"><Share2 size={14}/> خَلّي اللحظة أقرب</span><h2>شارك الهدية برمز QR</h2><p>امسح الرمز بكاميرا الموبايل لفتح رابط الهدية مباشرة.</p></div>
+      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(window.location.href)}`} alt="رمز QR لفتح الهدية" loading="lazy"/>
+    </section>
     <div className="view-bottom"><p>كل لحظة حلوة تستاهل تتفتكر.</p><div className="view-bottom-actions"><button className="btn btn-outline" onClick={downloadGift}><Upload size={16}/> احفظ الرسالة كملف</button><button className="btn btn-primary" onClick={startCreate}>اصنع هدية زي دي <ArrowLeft size={17}/></button></div></div>
   </main>;
 }
@@ -704,6 +777,8 @@ function AdminPage() {
           <article className="admin-stat"><span className="admin-stat-icon"><Clock3 size={19}/></span><small>زيارات آخر 7 أيام</small><strong>{(dashboard.stats?.visits7d || 0).toLocaleString("ar-EG")}</strong></article>
           <article className="admin-stat"><span className="admin-stat-icon"><Gift size={19}/></span><small>إجمالي الهدايا</small><strong>{(dashboard.stats?.totalGifts || 0).toLocaleString("ar-EG")}</strong></article>
           <article className="admin-stat"><span className="admin-stat-icon"><MessageCircle size={19}/></span><small>رسائل محفوظة</small><strong>{(dashboard.stats?.totalGifts || 0).toLocaleString("ar-EG")}</strong></article>
+          <article className="admin-stat"><span className="admin-stat-icon"><Check size={19}/></span><small>طلبات دفع معتمدة</small><strong>{(dashboard.stats?.approvedOrders || 0).toLocaleString("ar-EG")}</strong></article>
+          <article className="admin-stat"><span className="admin-stat-icon"><Gift size={19}/></span><small>إجمالي المدفوعات المؤكدة</small><strong>{(Number(dashboard.stats?.totalRevenueCents || 0) / 100).toLocaleString("ar-EG")} ج.م</strong></article>
         </div>
         {reviewNotice && <div className="admin-review-notice">{reviewNotice}</div>}
         <section className="admin-panel admin-payment-panel">

@@ -30,12 +30,13 @@ export default async function handler(req, res) {
 
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const [visitCountResult, visits7Result, visitsResult, pendingOrdersResult] = await Promise.all([
+  const [visitCountResult, visits7Result, visitsResult, pendingOrdersResult, approvedOrdersResult] = await Promise.all([
     db.from("site_visits").select("*", { count: "exact", head: true }),
     db.from("site_visits").select("*", { count: "exact", head: true }).gte("created_at", since),
     db.from("site_visits").select("id,path,referrer,created_at").order("created_at", { ascending: false }).limit(300),
     db.from("gift_orders").select("id,slug,gift,payer_phone,payment_reference,amount_cents,status,created_at")
-      .eq("status", "awaiting_review").order("created_at", { ascending: false }).limit(100)
+      .eq("status", "awaiting_review").order("created_at", { ascending: false }).limit(100),
+    db.from("gift_orders").select("id,amount_cents", { count: "exact" }).eq("status", "approved")
   ]);
 
   // Read gifts in pages so the admin dashboard isn't silently capped at the newest 300.
@@ -50,17 +51,19 @@ export default async function handler(req, res) {
     if (batch.length < pageSize) break;
   }
 
-  const firstError = giftsError || visitCountResult.error || visits7Result.error || visitsResult.error || pendingOrdersResult.error;
+  const firstError = giftsError || visitCountResult.error || visits7Result.error || visitsResult.error || pendingOrdersResult.error || approvedOrdersResult.error;
   if (firstError) {
     const missingVisits = String(firstError.message || "").toLowerCase().includes("site_visits");
     return res.status(503).json({ error: missingVisits ? "جدول الزيارات لسه مش متجهز. شغّل ملف supabase/admin-analytics.sql في SQL Editor ثم حدّث الصفحة." : "تعذر قراءة بيانات Supabase: " + firstError.message });
   }
   const visits = visitsResult.data || [];
+  const approvedOrders = approvedOrdersResult.data || [];
+  const totalRevenueCents = approvedOrders.reduce((sum, order) => sum + Number(order.amount_cents || 0), 0);
   const counts = new Map();
   for (const visit of visits) counts.set(visit.path, (counts.get(visit.path) || 0) + 1);
   const topPaths = [...counts.entries()].map(([path, count]) => ({ path, count })).sort((a, b) => b.count - a.count).slice(0, 8);
   return res.status(200).json({
-    stats: { totalVisits: visitCountResult.count || 0, visits7d: visits7Result.count || 0, totalGifts: allGifts.length },
+    stats: { totalVisits: visitCountResult.count || 0, visits7d: visits7Result.count || 0, totalGifts: allGifts.length, approvedOrders: approvedOrdersResult.count || 0, totalRevenueCents },
     gifts: allGifts,
     pendingOrders: pendingOrdersResult.data || [],
     visits,
