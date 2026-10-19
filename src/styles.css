@@ -181,3 +181,73 @@ body{background:radial-gradient(ellipse at 12% 4%,#fff0f6 0,transparent 30%),rad
 .approved-share-link{width:100%;overflow-wrap:anywhere;background:#fff5f8;border:1px solid #f0d9e2;border-radius:12px;padding:13px;margin:18px 0;color:#8f3158;font-size:12px;text-align:center}
 .approved-share-button,.approved-open-button{width:100%;margin-top:9px}
 .approved-share-notice{font-size:12px;color:#9b3c62;line-height:1.8}
+
+/* Mobile menu and hero overlap fix — October 2026 */
+@media(max-width:700px){
+  .topbar{position:sticky;top:0;z-index:100;isolation:isolate;background:#fffafc!important}
+  .nav-shell{position:relative}
+  .nav-links.open{
+    position:fixed!important;
+    top:70px!important;
+    right:0!important;
+    left:0!important;
+    width:100%!important;
+    max-height:calc(100dvh - 70px)!important;
+    overflow-y:auto!important;
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    gap:7px!important;
+    padding:14px 20px 22px!important;
+    background:#fffafc!important;
+    opacity:1!important;
+    visibility:visible!important;
+    border-top:1px solid #f0dce8!important;
+    border-bottom:1px solid #efd9e5!important;
+    box-shadow:0 18px 35px rgba(67,28,50,.18)!important;
+    z-index:999!important;
+  }
+  .nav-links.open>button{
+    position:relative!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:flex-start!important;
+    width:100%!important;
+    min-height:50px!important;
+    padding:13px 15px!important;
+    background:#fff!important;
+    color:#5e4554!important;
+    border:1px solid #f2e2ea!important;
+    border-radius:13px!important;
+    font-size:15px!important;
+    line-height:1.5!important;
+    opacity:1!important;
+    visibility:visible!important;
+    z-index:1!important;
+  }
+  .nav-links.open>button.nav-cta{
+    justify-content:center!important;
+    color:#fff!important;
+    background:linear-gradient(135deg,#d64f85,#a62c62)!important;
+    border:0!important;
+  }
+  main{position:relative;z-index:1}
+  .hero{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:0!important;padding-top:26px!important;min-height:0!important;overflow:visible!important}
+  .hero-copy{width:100%;padding:0!important;min-width:0!important}
+  .hero .eyebrow{display:flex!important;position:static!important;margin:0 0 12px!important;max-width:100%;font-size:12px;line-height:1.7}
+  .hero h1{position:static!important;display:block!important;margin:10px 0 16px!important;font-size:clamp(36px,9.2vw,49px)!important;line-height:1.32!important;letter-spacing:-1.1px!important;overflow-wrap:normal!important;word-break:normal!important}
+  .hero h1 span{display:inline!important}
+  .hero-lead{position:static!important;display:block!important;max-width:none!important;margin:0!important;font-size:14px!important;line-height:1.95!important}
+  .hero-actions{position:static!important;display:flex!important;align-items:stretch!important;gap:10px!important;flex-wrap:wrap!important;margin:22px 0 0!important}
+  .hero-actions .btn{min-height:54px!important;flex:1 1 100%!important;width:100%!important;padding:14px 16px!important;font-size:14px!important;white-space:normal!important}
+  .hero-trust{position:static!important;display:flex!important;flex-wrap:wrap!important;gap:8px!important;margin:18px 0 0!important;line-height:1.8}
+  .hero-art{position:relative!important;width:100%!important;height:340px!important;min-height:300px!important;margin:8px 0 0!important;transform:none!important;overflow:visible!important}
+  .hero-art:before{font-size:clamp(120px,38vw,160px)!important}
+  .hero-orbit{width:min(78vw,310px)!important;height:min(78vw,310px)!important}
+  .polaroid-front{width:min(54vw,205px)!important}
+  .polaroid-back{width:min(48vw,180px)!important}
+}
+@media(max-width:380px){
+  .hero h1{font-size:35px!important;line-height:1.34!important}
+  .hero-art{height:300px!important;min-height:280px!important}
+}
