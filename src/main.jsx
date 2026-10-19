@@ -179,7 +179,7 @@ function App() {
       setToast("اكتب اسم المُهدى إليه واسمك والرسالة الأول.");
       return;
     }
-    if (!/^(\\+?20)?1[0125][0-9]{8}$/.test(String(form.payerPhone || "").replace(/[\\s()-]/g, ""))) {
+    if (!/^(?:\+?20)?0?1[0125][0-9]{8}$/.test(String(form.payerPhone || "").replace(/[\s()-]/g, ""))) {
       setToast("اكتب رقم موبايل مصري صحيح علشان تكمل الدفع بالمحفظة.");
       return;
     }
