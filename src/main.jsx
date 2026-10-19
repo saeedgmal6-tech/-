@@ -166,7 +166,7 @@ function App() {
     setGiftLoading(true);
     let found = null;
     try {
-      const response = await fetch(`/api/gift?slug=${encodeURIComponent(id)}`, { cache: "no-store" });
+      const response = await fetch(`/api/gifts?slug=${encodeURIComponent(id)}`, { cache: "no-store" });
       const result = await response.json().catch(() => ({}));
       if (result.gift) found = decodeGiftRecord(result.gift);
     } catch {}
@@ -287,7 +287,7 @@ function App() {
       owners[record.slug] = ownerToken;
       localStorage.setItem("lahzetna_owner_tokens", JSON.stringify(owners));
     } catch {}
-    fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "payment_submitted" }) }).catch(() => {});
+    fetch("/api/track?mode=events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "payment_submitted" }) }).catch(() => {});
     try {
       const response = await fetch("/api/payments/create", {
         method: "POST",
@@ -324,14 +324,14 @@ function App() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   }
   function openGift(gift) {
-    fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "gift_view", slug: gift?.slug }) }).catch(() => {});
+    fetch("/api/track?mode=events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "gift_view", slug: gift?.slug }) }).catch(() => {});
     setActiveGift(gift);
     setPage("view");
     window.history.pushState({}, "", `/g/${gift.slug}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function startCreate() {
-    fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "gift_start" }) }).catch(() => {});
+    fetch("/api/track?mode=events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "gift_start" }) }).catch(() => {});
     setActiveGift(null);
     setPage("create");
     window.history.pushState({}, "", "/");
@@ -761,11 +761,11 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
   async function submitGiftReply(event) {
     event.preventDefault(); setReplyBusy(true); setReplyStatus("");
     try {
-      const response = await fetch("/api/replies", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: gift.slug, reaction: replyReaction, message: replyText.trim() }) });
+      const response = await fetch("/api/track?mode=replies", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: gift.slug, reaction: replyReaction, message: replyText.trim() }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "تعذر إرسال ردك.");
       setReplyText(""); setReplyStatus("وصل ردك لصاحب الهدية ❤️");
-      fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "reply_submitted", slug: gift.slug }) }).catch(() => {});
+      fetch("/api/track?mode=events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "reply_submitted", slug: gift.slug }) }).catch(() => {});
     } catch (error) { setReplyStatus(error.message || "حصلت مشكلة في إرسال الرد."); }
     finally { setReplyBusy(false); }
   }
@@ -773,7 +773,7 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
     if (!ownerToken) return;
     setReplyBusy(true); setReplyStatus("");
     try {
-      const response = await fetch(`/api/replies?slug=${encodeURIComponent(gift.slug)}&key=${encodeURIComponent(ownerToken)}`, { cache: "no-store" });
+      const response = await fetch(`/api/track?mode=replies?slug=${encodeURIComponent(gift.slug)}&key=${encodeURIComponent(ownerToken)}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "تعذر تحميل الردود.");
       setOwnerReplies(data.replies || []); setOwnerPanelOpen(true);
@@ -867,7 +867,7 @@ function MyGifts({ gifts, openGift, startCreate, setGifts, setToast, copyGiftFor
     setImporting(true);
     try {
       let found = null;
-      const response = await fetch(`/api/gift?slug=${encodeURIComponent(id)}`, { cache: "no-store" });
+      const response = await fetch(`/api/gifts?slug=${encodeURIComponent(id)}`, { cache: "no-store" });
       const result = await response.json().catch(() => ({}));
       if (result.gift) found = decodeGiftRecord(result.gift);
       if (!found) found = readLocal().find(item => item.slug === id) || null;
