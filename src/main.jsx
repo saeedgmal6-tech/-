@@ -590,6 +590,8 @@ function AdminPage() {
   const [error, setError] = useState("");
   const [tab, setTab] = useState("messages");
   const [giftSearch, setGiftSearch] = useState("");
+  const [reviewingOrderId, setReviewingOrderId] = useState("");
+  const [reviewNotice, setReviewNotice] = useState("");
 
   async function loadDashboard() {
     setLoading(true);
@@ -643,6 +645,30 @@ function AdminPage() {
     setPassword("");
   }
 
+  async function reviewPayment(order, action) {
+    const verb = action === "approve" ? "قبول ونشر الهدية" : "رفض طلب الدفع";
+    if (!window.confirm("هل تريد " + verb + "؟")) return;
+    setReviewingOrderId(order.id);
+    setReviewNotice("");
+    setError("");
+    try {
+      const response = await fetch("/api/admin/payment-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ orderId: order.id, action })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "تعذر تحديث الطلب.");
+      setReviewNotice(action === "approve" ? "تمت الموافقة ونشر الهدية: " + data.giftUrl : "تم رفض طلب الدفع.");
+      await loadDashboard();
+    } catch (err) {
+      setError(err.message || "تعذر مراجعة طلب الدفع.");
+    } finally {
+      setReviewingOrderId("");
+    }
+  }
+
   const dateText = value => value ? new Date(value).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }) : "—";
   const filteredGifts = (dashboard?.gifts || []).filter(gift => {
     const q = giftSearch.trim().toLocaleLowerCase();
@@ -679,6 +705,17 @@ function AdminPage() {
           <article className="admin-stat"><span className="admin-stat-icon"><Gift size={19}/></span><small>إجمالي الهدايا</small><strong>{(dashboard.stats?.totalGifts || 0).toLocaleString("ar-EG")}</strong></article>
           <article className="admin-stat"><span className="admin-stat-icon"><MessageCircle size={19}/></span><small>رسائل محفوظة</small><strong>{(dashboard.stats?.totalGifts || 0).toLocaleString("ar-EG")}</strong></article>
         </div>
+        {reviewNotice && <div className="admin-review-notice">{reviewNotice}</div>}
+        <section className="admin-panel admin-payment-panel">
+          <div className="admin-panel-heading"><div><h2>طلبات الدفع المعلقة ({dashboard.pendingOrders?.length || 0})</h2><p>كل طلب هنا ينتظر مراجعتك. قبول الطلب ينشر الهدية، والرفض يمنع نشرها.</p></div></div>
+          {!dashboard.pendingOrders?.length ? <div className="admin-empty">لا توجد طلبات دفع جديدة للمراجعة.</div> :
+            <div className="admin-payment-list">{dashboard.pendingOrders.map(order => <article className="admin-payment-order" key={order.id}>
+              <div className="admin-message-top"><div><strong>{order.gift?.title || "هدية من لحظتنا"}</strong><small>من {order.gift?.from_name || "—"} إلى {order.gift?.to_name || "—"}</small></div><time>{dateText(order.created_at)}</time></div>
+              <div className="admin-gift-details"><span>المبلغ: {(Number(order.amount_cents || 2000) / 100).toLocaleString("ar-EG")} جنيه</span><span>رقم المحوّل: <b dir="ltr">{order.payer_phone || "—"}</b></span><span>رقم العملية: <b dir="ltr">{order.payment_reference || "—"}</b></span><span>رقم الطلب: <b dir="ltr">{String(order.id).slice(0,8)}</b></span></div>
+              <p className="admin-payment-message">{order.gift?.message || ""}</p>
+              <div className="admin-payment-actions"><button className="admin-btn admin-approve" disabled={!!reviewingOrderId} onClick={() => reviewPayment(order,"approve")}>{reviewingOrderId === order.id ? "جارٍ الحفظ..." : "قبول ونشر الهدية"} <Check size={16}/></button><button className="admin-btn admin-reject" disabled={!!reviewingOrderId} onClick={() => reviewPayment(order,"reject")}>رفض الطلب <X size={16}/></button></div>
+            </article>)}</div>}
+        </section>
         <div className="admin-tabs"><button className={tab==="messages"?"active":""} onClick={()=>setTab("messages")}><MessageCircle size={16}/> الرسائل والهدايا ({dashboard.gifts?.length || 0})</button><button className={tab==="visits"?"active":""} onClick={()=>setTab("visits")}><Eye size={16}/> سجل الزيارات</button></div>
         {tab === "messages" ? <div className="admin-panel">
           <div className="admin-panel-heading"><div><h2>كل الهدايا التي أنشأها المستخدمون</h2><p>إجمالي {((dashboard.gifts || []).length).toLocaleString("ar-EG")} هدية محفوظة في قاعدة البيانات، مرتبة من الأحدث للأقدم.</p></div></div>
