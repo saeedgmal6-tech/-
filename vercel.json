@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/g/:slug",
-      "destination": "/index.html"
+      "destination": "/api/gift-page?slug=:slug"
     },
     {
       "source": "/(.*)",
