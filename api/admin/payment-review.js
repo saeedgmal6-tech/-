@@ -16,6 +16,22 @@ function authorized(req) {
   } catch { return false; }
 }
 
+
+async function notifyTelegram(message) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+  try {
+    await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text: message })
+    });
+  } catch (error) {
+    console.error("Telegram review notification failed:", error?.message || error);
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -37,6 +53,7 @@ export default async function handler(req, res) {
       rejection_reason: String(reason || "لم يتم تأكيد التحويل").slice(0, 300)
     }).eq("id", orderId).eq("status", "awaiting_review");
     if (error) return res.status(500).json({ error: "تعذر رفض الطلب." });
+    await notifyTelegram("❌ تم رفض طلب دفع في لحظتنا.\nرقم الطلب: " + String(orderId).slice(0, 8) + "\nراجع لوحة الإدارة: https://lahzetna.vercel.app/admin");
     return res.status(200).json({ ok: true, status: "rejected" });
   }
 
@@ -69,5 +86,6 @@ export default async function handler(req, res) {
     status: "approved", reviewed_at: new Date().toISOString()
   }).eq("id", orderId).eq("status", "awaiting_review");
   if (updateError) return res.status(500).json({ error: "تم حفظ الهدية لكن تعذر تحديث حالة الطلب. حدّث لوحة الإدارة قبل إعادة المحاولة." });
+  await notifyTelegram("✅ تمت الموافقة على طلب ونشر الهدية في لحظتنا.\nمن: " + String(order.gift?.from_name || "—") + "\nإلى: " + String(order.gift?.to_name || "—") + "\nالرابط: https://lahzetna.vercel.app/g/" + order.slug);
   return res.status(200).json({ ok: true, status: "approved", giftUrl: "https://lahzetna.vercel.app/g/" + order.slug });
 }
