@@ -58,6 +58,9 @@ export default async function handler(req, res) {
   }
 
   const giftToPublish = { ...order.gift, created_at: new Date().toISOString() };
+  const metaItem = Array.isArray(giftToPublish.photos) ? giftToPublish.photos.find(item => item && typeof item === "object" && item.__lahzetna_meta) : null;
+  const ownerToken = String(metaItem?.__lahzetna_meta?.owner_token || "");
+  if (metaItem?.__lahzetna_meta) delete metaItem.__lahzetna_meta.owner_token;
   let { error: giftError } = await db.from("gifts").insert(giftToPublish);
   // Some existing Supabase projects still have an older four-theme constraint.
   // If the theme check rejects a newer theme, retry with a compatible known theme.
@@ -81,6 +84,11 @@ export default async function handler(req, res) {
   if (giftError && giftError.code !== "23505") {
     console.error("Manual approval gift insert failed:", giftError.message);
     return res.status(500).json({ error: "تعذر نشر الهدية. لم يتم إنهاء مراجعة الطلب." });
+  }
+  if (ownerToken && /^[a-f0-9]{64}$/i.test(ownerToken)) {
+    const tokenHash = crypto.createHash("sha256").update(ownerToken).digest("hex");
+    const { error: ownerError } = await db.from("gift_owner_keys").upsert({ slug: order.slug, token_hash: tokenHash }, { onConflict: "slug" });
+    if (ownerError) console.error("Could not save private gift owner key; run supabase/feature-upgrades.sql:", ownerError.message);
   }
   const { error: updateError } = await db.from("gift_orders").update({
     status: "approved", reviewed_at: new Date().toISOString()
