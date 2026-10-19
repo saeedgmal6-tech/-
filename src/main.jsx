@@ -533,7 +533,7 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpl
             </div>
           </div>
           <label>الرسالة<textarea value={form.message} onChange={e=>setField("message",e.target.value)} rows={6} maxLength={1800} required placeholder="اكتب رسالتك هنا..."/></label>
-          <button type="button" className="btn btn-outline" onClick={async()=>{try{const r=await fetch("/api/ai/message",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({toName:form.toName,fromName:form.fromName,occasion:form.occasion,style:messageStyle,currentMessage:form.message})});const d=await r.json();if(!r.ok)throw new Error(d.error||"تعذر كتابة الرسالة.");setField("message",d.message); }catch(e){window.alert(e.message||"تعذر كتابة الرسالة.");}}}><WandSparkles size={16}/> اكتب لي رسالة مخصصة بالذكاء الاصطناعي</button>
+          <button type="button" className="btn btn-outline" onClick={async()=>{try{const r=await fetch("/api/ai/message",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({toName:form.toName,fromName:form.fromName,occasion:form.occasion,style:messageStyle,currentMessage:form.message})});const d=await r.json();if(!r.ok)throw new Error(d.error||"تعذر كتابة الرسالة.");if(d.fallback)window.alert(d.notice);setField("message",d.message); }catch(e){window.alert(e.message||"تعذر كتابة الرسالة.");}}}><WandSparkles size={16}/> اكتب لي رسالة مخصصة بالذكاء الاصطناعي</button>
           <div className="textarea-foot"><span>خليها بكلامك، ده اللي بيفرق ❤️</span><span>{form.message.length}/1800</span></div>
         </div>
         <div className="form-section">
