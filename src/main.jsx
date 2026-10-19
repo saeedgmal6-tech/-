@@ -311,7 +311,7 @@ function App() {
     }
   }
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const baseUrl = "https://lahzetna.vercel.app";
   const shareUrl = activeGift ? `${baseUrl}/g/${activeGift.slug}` : "";
   async function copyLink() {
     try {
@@ -616,7 +616,7 @@ function ManualPaymentPage({ pendingPayment, goHome }) {
   const [status, setStatus] = useState("awaiting_review");
   const [approvedGift, setApprovedGift] = useState(null);
   const [shareNotice, setShareNotice] = useState("");
-  const approvedUrl = approvedGift?.slug ? window.location.origin + "/g/" + encodeURIComponent(approvedGift.slug) : "";
+  const approvedUrl = approvedGift?.slug ? "https://lahzetna.vercel.app/g/" + encodeURIComponent(approvedGift.slug) : "";
   async function shareApprovedGift() {
     if (!approvedUrl) return;
     try {
@@ -708,7 +708,7 @@ function Success({ gift, shareUrl, copyLink, whatsappShare, startCreate, openGif
 }
 
 function GiftView({ gift, theme, loading, goHome, startCreate }) {
-  const [opened, setOpened] = useState(false);
+  const [opened, setOpened] = useState(true);
   const [unlockPassword, setUnlockPassword] = useState("");
   const [unlockError, setUnlockError] = useState("");
   const [unlockedGift, setUnlockedGift] = useState(null);
@@ -726,7 +726,7 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
 
   useEffect(() => {
     const clock = window.setInterval(() => setClockNow(Date.now()), 1000);
-    setOpened(false);
+    setOpened(true);
     setUnlockPassword("");
     setUnlockError("");
     setUnlockedGift(null);
