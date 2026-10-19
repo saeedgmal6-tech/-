@@ -1037,6 +1037,10 @@ function AdminPage() {
           <article className="admin-stat"><span className="admin-stat-icon"><MessageCircle size={19}/></span><small>رسائل محفوظة</small><strong>{(dashboard.stats?.totalGifts || 0).toLocaleString("ar-EG")}</strong></article>
           <article className="admin-stat"><span className="admin-stat-icon"><Check size={19}/></span><small>طلبات دفع معتمدة</small><strong>{(dashboard.stats?.approvedOrders || 0).toLocaleString("ar-EG")}</strong></article>
           <article className="admin-stat"><span className="admin-stat-icon"><Gift size={19}/></span><small>إجمالي المدفوعات المؤكدة</small><strong>{(Number(dashboard.stats?.totalRevenueCents || 0) / 100).toLocaleString("ar-EG")} ج.م</strong></article>
+          <article className="admin-stat"><span className="admin-stat-icon"><WandSparkles size={19}/></span><small>بدأوا إنشاء هدية · 30 يوم</small><strong>{(dashboard.funnel?.giftStarts || 0).toLocaleString("ar-EG")}</strong></article>
+          <article className="admin-stat"><span className="admin-stat-icon"><Upload size={19}/></span><small>طلبات دفع أُرسلت · 30 يوم</small><strong>{(dashboard.funnel?.paymentSubmissions || 0).toLocaleString("ar-EG")}</strong></article>
+          <article className="admin-stat"><span className="admin-stat-icon"><Eye size={19}/></span><small>فتح هدايا · 30 يوم</small><strong>{(dashboard.funnel?.giftViews || 0).toLocaleString("ar-EG")}</strong></article>
+          <article className="admin-stat"><span className="admin-stat-icon"><MessageCircle size={19}/></span><small>ردود المستلمين · 30 يوم</small><strong>{(dashboard.funnel?.replies || 0).toLocaleString("ar-EG")}</strong></article>
         </div>
         {reviewNotice && <div className="admin-review-notice">{reviewNotice}</div>}
         <section className="admin-panel admin-payment-panel">
