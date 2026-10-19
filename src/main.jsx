@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -56,16 +56,21 @@ function App() {
     }
   }, []);
 
+  const lastTrackedView = useRef("");
   useEffect(() => {
     const path = window.location.pathname || "/";
     if (path === "/admin" || path.startsWith("/api/")) return;
+    if (/^\\/g\\/[^/]+/.test(path) && page !== "view") return;
+    const viewKey = path + "|" + page;
+    if (lastTrackedView.current === viewKey) return;
+    lastTrackedView.current = viewKey;
     fetch("/api/track", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path, referrer: document.referrer || "" }),
       keepalive: true
     }).catch(() => {});
-  }, []);
+  }, [page]);
 
   useEffect(() => { saveLocal(gifts); }, [gifts]);
 
@@ -467,7 +472,7 @@ function AdminPage() {
       const response = await fetch("/api/admin/data", { credentials: "same-origin" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        if (response.status === 401) setAuthenticated(false);
+        if (response.status === 401) { setAuthenticated(false); return; }
         throw new Error(data.error || "تعذر تحميل لوحة التحكم.");
       }
       setDashboard(data);
