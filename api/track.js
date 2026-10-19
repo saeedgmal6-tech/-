@@ -30,8 +30,12 @@ export default async function handler(req, res) {
     const reaction = String(body.reaction || "❤️");
     const message = String(body.message || "").trim().slice(0, 500);
     if (!validSlug(slug) || !reactions.has(reaction)) return res.status(400).json({ error: "بيانات الرد غير صحيحة." });
-    const { data: gift, error: giftError } = await db.from("gifts").select("slug").eq("slug", slug).maybeSingle();
+    const { data: gift, error: giftError } = await db.from("gifts").select("slug,photos").eq("slug", slug).maybeSingle();
     if (giftError || !gift) return res.status(404).json({ error: "الهدية غير موجودة أو لم تُنشر بعد." });
+    const metaItem = Array.isArray(gift.photos) ? gift.photos.find(item => item && typeof item === "object" && item.__lahzetna_meta) : null;
+    const giftMeta = metaItem?.__lahzetna_meta || {};
+    if (giftMeta.open_at && Date.parse(giftMeta.open_at) > Date.now()) return res.status(403).json({ error: "الهدية لسه ما اتفتحتش. ابعت ردك بعد موعد فتحها." });
+    if (giftMeta.expires_at && new Date(giftMeta.expires_at + "T23:59:59").getTime() < Date.now()) return res.status(410).json({ error: "انتهت صلاحية الهدية." });
     const { error } = await db.from("gift_replies").insert({ slug, reaction, message });
     if (error) {
       console.error("Gift reply insert failed:", error.message);
