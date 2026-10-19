@@ -25,7 +25,7 @@ export default async function handler(req, res) {
 
   const record = body?.gift;
   const phone = String(body?.phone || "").replace(/[\s()-]/g, "");
-  if (!record || !/^(\+?20)?1[0125][0-9]{8}$/.test(phone)) {
+  if (!record || !/^(?:\+?20)?0?1[0125][0-9]{8}$/.test(phone)) {
     return res.status(400).json({ error: "اكتب رقم موبايل مصري صحيح لإتمام الدفع بالمحفظة." });
   }
   const gift = {
