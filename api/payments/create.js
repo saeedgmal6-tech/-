@@ -13,7 +13,19 @@ function normalizeGift(record) {
     date: record.date || null,
     occasion: String(record.occasion || "مجرد إني بحبك").slice(0, 100),
     theme: themes.has(record.theme) ? record.theme : "rose",
-    photos: Array.isArray(record.photos) ? record.photos.slice(0, 5).filter(x => typeof x === "string") : [],
+    photos: [
+      ...(Array.isArray(record.photos) ? record.photos.slice(0, 5).filter(x => typeof x === "string") : []),
+      { __lahzetna_meta: {
+        audio_url: typeof record.audio_url === "string" ? record.audio_url : "",
+        audio_name: String(record.audio_name || "").slice(0, 180),
+        video_url: typeof record.video_url === "string" ? record.video_url : "",
+        expires_at: record.expires_at || null,
+        custom_accent: /^#[0-9a-f]{6}$/i.test(String(record.custom_accent || "")) ? record.custom_accent : "",
+        font_family: ["Cairo","Arial","Tahoma","Georgia"].includes(record.font_family) ? record.font_family : "Cairo",
+        locked: Boolean(record.locked),
+        secure_payload: record.secure_payload && typeof record.secure_payload === "object" ? record.secure_payload : null
+      } }
+    ],
     cover: typeof record.cover === "string" ? record.cover : "",
     music: Boolean(record.music)
   };
