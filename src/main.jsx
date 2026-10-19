@@ -165,10 +165,11 @@ function App() {
   async function loadGift(id) {
     setGiftLoading(true);
     let found = null;
-    if (supabase) {
-      const { data, error } = await supabase.from("gifts").select("*").eq("slug", id).maybeSingle();
-      if (!error && data) found = decodeGiftRecord(data);
-    }
+    try {
+      const response = await fetch(`/api/gift?slug=${encodeURIComponent(id)}`, { cache: "no-store" });
+      const result = await response.json().catch(() => ({}));
+      if (result.gift) found = decodeGiftRecord(result.gift);
+    } catch {}
     if (!found) found = decodeGiftRecord(readLocal().find(g => g.slug === id) || null);
     setActiveGift(found);
     setPage("view");
@@ -865,12 +866,12 @@ function MyGifts({ gifts, openGift, startCreate, setGifts, setToast, copyGiftFor
     if (!id) { setToast("الصق رابط هدية صحيح من لحظتنا."); return; }
     setImporting(true);
     try {
-      let found = readLocal().find(item => item.slug === id) || null;
-      if (supabase) {
-        const { data, error } = await supabase.from("gifts").select("*").eq("slug", id).maybeSingle();
-        if (!error && data) found = decodeGiftRecord(data);
-      }
-      if (!found) throw new Error("مش لاقي الهدية. اتأكد إن الرابط صحيح وإن الهدية اتنشرت.");
+      let found = null;
+      const response = await fetch(`/api/gift?slug=${encodeURIComponent(id)}`, { cache: "no-store" });
+      const result = await response.json().catch(() => ({}));
+      if (result.gift) found = decodeGiftRecord(result.gift);
+      if (!found) found = readLocal().find(item => item.slug === id) || null;
+      if (!found) throw new Error(result.error || "مش لاقي الهدية. اتأكد إن الرابط صحيح وإن الهدية اتنشرت.");
       setGifts(prev => [found, ...prev.filter(item => item.slug !== found.slug)]);
       setGiftUrlInput("");
       setToast("اتضافت الهدية لقائمة هداياي على الجهاز ده.");
@@ -880,8 +881,7 @@ function MyGifts({ gifts, openGift, startCreate, setGifts, setToast, copyGiftFor
   function removeGift(gift) {
     if (!window.confirm("متأكد إنك عايز تحذف الهدية دي من الجهاز؟")) return;
     setGifts(prev=>prev.filter(g=>g.slug!==gift.slug));
-    if (supabase) supabase.from("gifts").delete().eq("slug",gift.slug).then(({error})=>{if(error) console.error(error);});
-    setToast("تم حذف الهدية من القائمة");
+    setToast("تمت إزالة الهدية من قائمة هذا الجهاز. الرابط المنشور لا يُحذف من هنا.");
   }
   return <main className="inner-page section-wrap mygifts-page">
     <div className="page-intro"><span className="eyebrow"><Heart size={15}/> ذكرياتك</span><h1>هدايا <span>لحظتنا</span></h1><p>كل هدية عملتها هتلاقيها هنا على الجهاز ده.</p></div>
