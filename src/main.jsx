@@ -163,6 +163,7 @@ function App() {
   }, [page]);
 
   async function loadGift(id) {
+    fetch("/api/track?mode=events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "gift_view", slug: id }) }).catch(() => {});
     setGiftLoading(true);
     let found = null;
     try {
