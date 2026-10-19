@@ -341,6 +341,7 @@ function App() {
       audioName: gift.audio_name || "",
       videoUrl: gift.video_url || "",
       expiresAt: gift.expires_at || "",
+      openAt: gift.open_at || "",
       password: "",
       customAccent: gift.custom_accent || "",
       fontFamily: gift.font_family || "Cairo",
@@ -912,6 +913,26 @@ function AdminPage() {
     return [gift.title, gift.from_name, gift.to_name, gift.message, gift.occasion, gift.slug]
       .some(value => String(value || "").toLocaleLowerCase().includes(q));
   });
+  function exportGiftsCsv() {
+    const columns = [
+      ["عنوان الهدية", "title"], ["من", "from_name"], ["إلى", "to_name"],
+      ["المناسبة", "occasion"], ["الرسالة", "message"], ["الثيم", "theme"],
+      ["الرابط", "slug"], ["تاريخ الإنشاء", "created_at"], ["التاريخ المميز", "date"]
+    ];
+    const cell = value => {
+      let text = String(value ?? "").replace(/[\r\n]+/g, " ").trim();
+      if (/^[=+\-@]/.test(text)) text = "'" + text;
+      return '"' + text.replace(/"/g, '""') + '"';
+    };
+    const rows = [columns.map(([label]) => cell(label)).join(",")];
+    for (const gift of filteredGifts) {
+      rows.push(columns.map(([, key]) => cell(key === "slug" ? window.location.origin + "/g/" + gift.slug : gift[key])).join(","));
+    }
+    const csv = "\uFEFF" + rows.join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a"); a.href = url; a.download = "lahzetna-gifts.csv"; a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   return <main className="admin-shell" dir="rtl">
     <div className="admin-top">
@@ -957,7 +978,7 @@ function AdminPage() {
         <div className="admin-tabs"><button className={tab==="messages"?"active":""} onClick={()=>setTab("messages")}><MessageCircle size={16}/> الرسائل والهدايا ({dashboard.gifts?.length || 0})</button><button className={tab==="visits"?"active":""} onClick={()=>setTab("visits")}><Eye size={16}/> سجل الزيارات</button></div>
         {tab === "messages" ? <div className="admin-panel">
           <div className="admin-panel-heading"><div><h2>كل الهدايا التي أنشأها المستخدمون</h2><p>إجمالي {((dashboard.gifts || []).length).toLocaleString("ar-EG")} هدية محفوظة في قاعدة البيانات، مرتبة من الأحدث للأقدم.</p></div></div>
-          <input className="admin-gift-search" type="search" value={giftSearch} onChange={e=>setGiftSearch(e.target.value)} placeholder="ابحث بالاسم أو عنوان الهدية أو نص الرسالة..." aria-label="البحث في الهدايا"/>
+          <div className="admin-export-row"><input className="admin-gift-search" type="search" value={giftSearch} onChange={e=>setGiftSearch(e.target.value)} placeholder="ابحث بالاسم أو عنوان الهدية أو نص الرسالة..." aria-label="البحث في الهدايا"/><button className="admin-btn admin-btn-ghost" type="button" onClick={exportGiftsCsv} disabled={!filteredGifts.length}><Upload size={15}/> تنزيل النتائج CSV ({filteredGifts.length})</button></div>
           {!dashboard.gifts?.length ? <div className="admin-empty">لسه مفيش هدايا محفوظة في قاعدة البيانات. الهدايا التي تُحفظ على جهاز صاحبها فقط لن تظهر هنا.</div> : filteredGifts.length === 0 ? <div className="admin-empty">مفيش هدايا مطابقة للبحث.</div> : <div className="admin-message-list">{filteredGifts.map(gift=><article className="admin-message" key={gift.id || gift.slug}>
             {gift.cover && <a className="admin-gift-cover-link" href={"/g/"+encodeURIComponent(gift.slug)} target="_blank" rel="noreferrer"><img className="admin-gift-cover" src={gift.cover} alt={"غلاف "+(gift.title || "الهدية")} loading="lazy"/></a>}
             <div className="admin-message-top"><div><strong>{gift.title || "هدية من لحظتنا"}</strong><small>من {gift.from_name} إلى {gift.to_name}</small></div><time>{dateText(gift.created_at)}</time></div>
