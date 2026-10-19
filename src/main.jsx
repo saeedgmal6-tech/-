@@ -5,7 +5,7 @@ import {
   ArrowLeft, ArrowUpLeft, Heart, Sparkles, Gift, Camera, CalendarDays,
   Link2, MessageCircle, ChevronLeft, ChevronRight, Check, Copy, Eye,
   Plus, Trash2, ImagePlus, WandSparkles, Music2, LockKeyhole, Menu, X,
-  Clock3, Stars, Flower2, CircleHelp, ExternalLink, Upload, Share2
+  Clock3, Stars, Flower2, CircleHelp, ExternalLink, Upload, Share2, Video
 } from "lucide-react";
 import "./styles.css";
 
