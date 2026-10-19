@@ -714,7 +714,7 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
   const visibleGift = unlockedGift || gift;
   const photos = Array.isArray(visibleGift.photos) ? visibleGift.photos : [];
   const downloadGift = () => {
-    const text = (gift.title || "هدية من لحظتنا") + "\n\nإلى: " + (gift.to_name || "") + "\nمن: " + (gift.from_name || "") + "\nالمناسبة: " + (gift.occasion || "") + "\n\n" + (gift.message || "") + "\n\n" + (gift.date ? "التاريخ: " + fmtDate(gift.date) + "\n" : "") + "صُنعت بحب من لحظتنا";
+    const text = (visibleGift.title || "هدية من لحظتنا") + "\n\nإلى: " + (visibleGift.to_name || "") + "\nمن: " + (visibleGift.from_name || "") + "\nالمناسبة: " + (visibleGift.occasion || "") + "\n\n" + (visibleGift.message || "") + "\n\n" + (visibleGift.date ? "التاريخ: " + fmtDate(visibleGift.date) + "\n" : "") + "صُنعت بحب من لحظتنا";
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "lahzetna-gift.txt"; a.click();
@@ -722,7 +722,7 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
   };
   if (!opened) return <main className="view-page section-wrap surprise-stage">
     <div className="view-top"><button className="text-link" onClick={goHome}><ChevronRight size={17}/> الرئيسية</button><span><Heart size={14} fill="currentColor"/> لحظتنا</span></div>
-    <section className={`surprise-envelope theme-${gift.theme || "rose"}`} style={{background:theme.bg,"--gift-accent":theme.accent}}>
+    <section className={`surprise-envelope theme-${gift.theme || "rose"}`} style={{background:theme.bg,"--gift-accent":gift.custom_accent || theme.accent,fontFamily:gift.font_family || "Cairo"}}>
       <div className="surprise-sparkles" aria-hidden="true">✦　♡　✦</div>
       <div className="surprise-gift-icon"><Gift size={44}/></div>
       <span className="full-kicker">{visibleGift.occasion || "هدية من القلب"}</span>
@@ -739,7 +739,7 @@ function GiftView({ gift, theme, loading, goHome, startCreate }) {
     <article className={`full-gift full-${visibleGift.theme||"rose"}`} style={{background:theme.bg,"--gift-accent":visibleGift.custom_accent || theme.accent,fontFamily:visibleGift.font_family || "Cairo"}}>
       <div className="full-gift-inner">
         <div className="full-brand"><Heart size={18} fill="currentColor"/> LAHZETNA</div>
-        <span className="full-kicker">{gift.occasion || "هدية من القلب"}</span>
+        <span className="full-kicker">{visibleGift.occasion || "هدية من القلب"}</span>
         <div className="full-heart"><Heart size={50} fill="currentColor"/></div>
         <h1>{visibleGift.title || "حكايتنا لسه مكملة"}</h1>
         <div className="full-names"><span>{visibleGift.from_name}</span><Heart size={18} fill="currentColor"/><span>{visibleGift.to_name}</span></div>
@@ -794,7 +794,7 @@ function MyGifts({ gifts, openGift, startCreate, setGifts, setToast, copyGiftFor
     <div className="page-intro"><span className="eyebrow"><Heart size={15}/> ذكرياتك</span><h1>هدايا <span>لحظتنا</span></h1><p>كل هدية عملتها هتلاقيها هنا على الجهاز ده.</p></div>
     <form className="gift-import-form" onSubmit={importGift}><label>استرجع هدية من رابطها<input value={giftUrlInput} onChange={e=>setGiftUrlInput(e.target.value)} placeholder="الصق رابط الهدية هنا" dir="ltr"/></label><button className="btn btn-outline" type="submit" disabled={importing}>{importing?"جاري الاسترجاع...":"إضافة لهداياي"}</button><small>مفيد لو فتحت الموقع من جهاز جديد؛ لازم يكون معاك رابط الهدية.</small></form>
     {gifts.length===0 ? <div className="empty-state"><span className="empty-heart"><Gift size={34}/></span><h2>لسه مفيش هدايا</h2><p>أول هدية ممكن تكون بداية ذكرى جميلة.</p><button className="btn btn-primary" onClick={startCreate}>اصنع أول هدية <ArrowLeft size={17}/></button></div> :
-      <div className="gifts-grid">{gifts.map(g=><div className="gift-list-card" key={g.slug}><button className={`gift-list-cover cover-${g.theme||"rose"}`} onClick={()=>openGift(g)}>{g.cover?<img src={g.cover} alt=""/>:<Heart size={40} fill="currentColor"/>}<span>{(themes.find(t=>t.id===g.theme)||themes[0]).emoji}</span></button><div className="gift-list-body"><small>إلى {g.to_name}</small><h3>{g.title||`هدية إلى ${g.to_name}`}</h3><p>{g.message?.slice(0,90)}{(g.message||"").length>90?"…":""}</p><div className="gift-list-actions"><button onClick={()=>openGift(g)}><Eye size={15}/> عرض</button><button onClick={()=>copyGiftForEditing(g)}><WandSparkles size={15}/> تعديل كنسخة</button><button onClick={()=>{navigator.clipboard?.writeText(`${window.location.origin}/g/${g.slug}`).then(()=>setToast("تم نسخ الرابط")).catch(()=>window.prompt("انسخ الرابط",`${window.location.origin}/g/${g.slug}`));}}><Copy size={15}/> نسخ الرابط</button><button className="delete-action" onClick={()=>removeGift(g)} aria-label="حذف"><Trash2 size={15}/></button></div></div></div>)}</div>}
+      <div className="gifts-grid">{gifts.map(g=><div className="gift-list-card" key={g.slug}><button className={`gift-list-cover cover-${g.theme||"rose"}`} onClick={()=>openGift(g)}>{g.cover?<img src={g.cover} alt=""/>:<Heart size={40} fill="currentColor"/>}<span>{(themes.find(t=>t.id===g.theme)||themes[0]).emoji}</span></button><div className="gift-list-body"><small>إلى {g.to_name}</small><h3>{g.title||`هدية إلى ${g.to_name}`}</h3><p>{g.message?.slice(0,90)}{(g.message||"").length>90?"…":""}</p><div className="gift-list-actions"><button onClick={()=>openGift(g)}><Eye size={15}/> عرض</button>{!g.locked && <button onClick={()=>copyGiftForEditing(g)}><WandSparkles size={15}/> تعديل كنسخة</button>}<button onClick={()=>{navigator.clipboard?.writeText(`${window.location.origin}/g/${g.slug}`).then(()=>setToast("تم نسخ الرابط")).catch(()=>window.prompt("انسخ الرابط",`${window.location.origin}/g/${g.slug}`));}}><Copy size={15}/> نسخ الرابط</button><button className="delete-action" onClick={()=>removeGift(g)} aria-label="حذف"><Trash2 size={15}/></button></div></div></div>)}</div>}
   </main>;
 }
 
