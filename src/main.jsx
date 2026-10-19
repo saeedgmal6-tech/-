@@ -272,7 +272,7 @@ function App() {
       audio_name: form.password ? "" : (form.audioName || ""),
       video_url: form.password ? "" : (form.videoUrl || ""),
       expires_at: form.expiresAt || null,
-      open_at: form.openAt || null,
+      open_at: form.openAt ? new Date(form.openAt).toISOString() : null,
       timeline: form.password ? [] : (Array.isArray(form.timeline) ? form.timeline.slice(0, 6) : []),
       custom_accent: form.customAccent || "",
       font_family: form.fontFamily || "Cairo",
@@ -574,7 +574,7 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpl
           <div className="form-section-title"><span className="form-icon"><Flower2 size={19}/></span><div><h2>اختار الثيم</h2><p>خلي شكل الهدية يعكس إحساسك.</p></div></div>
           <div className="theme-options">{themes.map(t=><button type="button" key={t.id} className={`theme-option ${form.theme===t.id?"selected":""} option-${t.id}`} onClick={()=>setField("theme",t.id)}><span className="theme-swatch">{t.emoji}</span><span>{t.name}</span>{form.theme===t.id&&<Check size={16}/>}</button>)}</div>
           <div className="designer-controls"><label>لون الهدية <input type="color" value={form.customAccent || theme.accent} onChange={e=>setField("customAccent",e.target.value)}/></label><label>الخط<select value={form.fontFamily || "Cairo"} onChange={e=>setField("fontFamily",e.target.value)}><option value="Cairo">Cairo</option><option value="Arial">Arial</option><option value="Tahoma">Tahoma</option><option value="Georgia">Georgia</option></select></label></div>
-          <label>ميعاد فتح المفاجأة (اختياري)<input type="datetime-local" min={new Date().toISOString().slice(0,16)} value={form.openAt || ""} onChange={e=>setField("openAt",e.target.value)}/><span className="optional">قبل الموعد المحدد، صفحة الهدية هتعرض عدًّا تنازليًا. الميزة دي للعرض فقط وليست قفلًا أمنيًا.</span></label>
+          <label>ميعاد فتح المفاجأة (اختياري)<input type="datetime-local" min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,16)} value={form.openAt || ""} onChange={e=>setField("openAt",e.target.value)}/><span className="optional">قبل الموعد المحدد، صفحة الهدية هتعرض عدًّا تنازليًا. الميزة دي للعرض فقط وليست قفلًا أمنيًا.</span></label>
           <label>انتهاء صلاحية الرابط (اختياري)<input type="date" min={new Date().toISOString().slice(0,10)} value={form.expiresAt || ""} onChange={e=>setField("expiresAt",e.target.value)}/><span className="optional">بعد التاريخ المحدد، الموقع هيعرض إن الهدية انتهت صلاحيتها.</span></label>
           <label>كلمة مرور للهدية (اختياري)<input type="password" autoComplete="new-password" value={form.password || ""} onChange={e=>setField("password",e.target.value)} minLength={4} maxLength={80} placeholder="٤ أحرف على الأقل"/><span className="optional">محتوى الرسالة والصور والصوت والفيديو بيتشفّر قبل الإرسال، والمستلم يحتاج كلمة المرور لفتحه.</span></label>
         </div>
