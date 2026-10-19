@@ -86,3 +86,29 @@
 .admin-approve{background:#e5f7eb;color:#23733d}
 .admin-reject{background:#fff0f0;color:#a52d42}
 @media(max-width:600px){.admin-payment-order{padding:13px}.admin-payment-actions{flex-direction:column}.admin-payment-actions .admin-btn{width:100%}}
+
+/* Lahzetna media, privacy and gift designer additions */
+.media-upload-card{display:flex;flex-direction:column;gap:10px;padding:16px;margin:14px 0;border:1px solid var(--line);border-radius:16px;background:#fffafa}
+.media-upload-card h3{display:flex;align-items:center;gap:8px;font-size:14px;margin:0;color:var(--ink)}
+.media-upload-card>p{margin:0;font-size:11px;line-height:1.8;color:var(--muted)}
+.compact-upload{padding:15px!important;min-height:130px!important}
+.media-preview-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.media-preview-row audio{width:min(100%,420px)}
+.media-preview-row video{width:min(100%,420px);max-height:240px;border-radius:12px;background:#171717}
+.designer-controls{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.designer-controls label{display:flex;flex-direction:column;gap:8px}
+.designer-controls input[type=color]{width:100%;height:44px;padding:4px;border:1px solid var(--line);border-radius:10px;background:white}
+.designer-controls select{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);font:inherit}
+.unlock-card{width:min(100%,520px);margin:40px auto;padding:32px 24px;text-align:center;background:white;border:1px solid var(--line);border-radius:24px;box-shadow:0 18px 55px #8d48500b}
+.unlock-card h1{font-size:25px;margin:14px 0 10px;color:var(--ink)}
+.unlock-card>p{font-size:13px;line-height:1.9;color:var(--muted)}
+.unlock-card form{display:grid;gap:14px;text-align:right;margin-top:20px}
+.unlock-card label{display:grid;gap:8px;font-size:12px;font-weight:700}
+.unlock-card input{width:100%;padding:13px;border:1px solid var(--line);border-radius:11px;font:inherit}
+.unlock-error{color:#b42338!important;margin:0!important}
+.gift-audio-panel,.gift-video-panel{width:min(100%,560px);margin:22px auto;padding:16px;border:1px solid #ffffff80;border-radius:16px;background:#ffffff70}
+.gift-audio-panel h3{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 8px;font-size:15px}
+.gift-audio-panel p{font-size:12px;margin:0 0 12px;opacity:.8}
+.gift-audio-panel audio{width:100%;max-width:480px}
+.gift-video-panel video{display:block;width:100%;max-height:480px;border-radius:12px;background:#171717}
+@media(max-width:600px){.designer-controls{grid-template-columns:1fr}.media-preview-row{align-items:stretch;flex-direction:column}.media-preview-row audio,.media-preview-row video{width:100%}.unlock-card{padding:25px 17px}}
