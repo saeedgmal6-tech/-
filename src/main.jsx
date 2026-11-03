@@ -80,7 +80,7 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "حكايتنا لسه مكملة", fromName: "", toName: "", message: "في وسط كل الأيام العادية، إنت أجمل حاجة حصلتلي. كل لحظة معاك بتستاهل تتحكي، وكل ذكرى بينا ليها مكان خاص في قلبي. ❤️",
-    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, audioUrl: "", audioName: "", videoUrl: "", expiresAt: "", openAt: "", timeline: [], password: "", customAccent: "", fontFamily: "Cairo", payerPhone: "", transferReference: ""
+    date: "", occasion: "مجرد إني بحبك", theme: "rose", photos: [], cover: "", music: false, audioUrl: "", audioName: "", videoUrl: "", expiresAt: "", openAt: "", timeline: [], password: "", customAccent: "", fontFamily: "Cairo"
   });
   const [giftLoading, setGiftLoading] = useState(false);
 
@@ -314,8 +314,6 @@ function App() {
       password: "",
       customAccent: gift.custom_accent || "",
       fontFamily: gift.font_family || "Cairo",
-      payerPhone: "",
-      transferReference: ""
     });
     setActiveGift(null);
     setPage("create");
@@ -451,22 +449,6 @@ function How({ startCreate }) {
   </main>;
 }
 
-function WalletNumber() {
-  const [walletNumber, setWalletNumber] = useState("");
-  const [walletError, setWalletError] = useState("");
-  useEffect(() => {
-    fetch("/api/payments/config", { cache: "no-store" })
-      .then(async response => {
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || "رقم المحفظة غير متاح حاليًا.");
-        setWalletNumber(data.walletNumber || "");
-      })
-      .catch(error => setWalletError(error.message || "تعذر تحميل رقم المحفظة."));
-  }, []);
-  if (walletNumber) return <span className="wallet-number-row">حوّل إلى: <b dir="ltr">{walletNumber}</b> <button type="button" className="btn btn-outline" onClick={() => navigator.clipboard?.writeText(walletNumber)}>نسخ الرقم</button></span>;
-  return <span>{walletError || "جاري تحميل رقم محفظة الاستقبال..."}</span>;
-}
-
 function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpload, createGift, saving }) {
   const [preview, setPreview] = useState(false);
   const [messageStyle, setMessageStyle] = useState("romantic");
@@ -545,80 +527,6 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpl
         {preview && <div className="mobile-preview"><GiftPreview form={form} theme={theme}/></div>}
       </form>
       <aside className="preview-column"><div className="preview-sticky"><div className="preview-label"><Eye size={16}/> معاينة مباشرة</div><GiftPreview form={form} theme={theme}/><p className="preview-tip"><Sparkles size={15}/> المعاينة بتتغير مع كل تعديل.</p></div></aside>
-    </div>
-  </main>;
-}
-
-function PaymentReturn({ goHome }) {
-  return <main className="section-wrap payment-return-page">
-    <div className="payment-wait-card">
-      <div className="payment-wait-icon"><Clock3 size={30}/></div>
-      <span className="eyebrow">لحظتنا · تأكيد الدفع</span>
-      <h1>حالة الدفع</h1>
-      <p>لو وصلت هنا من رابط قديم، افتح الموقع وراجع حالة طلبك من جديد.</p>
-      <button className="btn btn-outline" onClick={goHome}>العودة للرئيسية</button>
-    </div>
-  </main>;
-}
-
-function ManualPaymentPage({ pendingPayment, goHome }) {
-  const [status, setStatus] = useState("awaiting_review");
-  const [approvedGift, setApprovedGift] = useState(null);
-  const [shareNotice, setShareNotice] = useState("");
-  const approvedUrl = approvedGift?.slug ? "https://lahzetna.vercel.app/g/" + encodeURIComponent(approvedGift.slug) : "";
-  async function shareApprovedGift() {
-    if (!approvedUrl) return;
-    try {
-      if (navigator.share) await navigator.share({ title: approvedGift.title || "هدية من لحظتنا", text: "عملتلك هدية مخصوص من قلبي ❤️", url: approvedUrl });
-      else { await navigator.clipboard.writeText(approvedUrl); setShareNotice("تم نسخ رابط الهدية، ابعته للشخص اللي بتحبه ❤️"); }
-    } catch (error) {
-      if (error?.name !== "AbortError") { try { await navigator.clipboard.writeText(approvedUrl); setShareNotice("تم نسخ رابط الهدية ❤️"); } catch { window.prompt("انسخ رابط الهدية وشاركه:", approvedUrl); } }
-    }
-  }
-  useEffect(() => {
-    if (!pendingPayment?.slug) return;
-    let stopped = false;
-    const check = async () => {
-      try {
-        const response = await fetch("/api/payments/status?slug=" + encodeURIComponent(pendingPayment.slug), { cache: "no-store" });
-        const data = await response.json().catch(() => ({}));
-        if (stopped) return;
-        if (response.ok && data.status === "approved" && data.gift) {
-          stopped = true;
-          setApprovedGift(decodeGiftRecord(data.gift));
-          setStatus("approved");
-          return;
-        }
-        if (data.status === "rejected") { setStatus("rejected"); stopped = true; }
-      } catch {}
-    };
-    check();
-    const timer = setInterval(check, 7000);
-    return () => { stopped = true; clearInterval(timer); };
-  }, [pendingPayment?.slug]);
-  return <main className="section-wrap payment-return-page">
-    <div className="payment-wait-card">
-      <div className="payment-wait-icon"><Clock3 size={30}/></div>
-      <span className="eyebrow">لحظتنا · مراجعة التحويل</span>
-      {status === "approved" && approvedGift ? <>
-        <div className="payment-approved-icon"><Check size={30}/></div>
-        <h1>مبروك! هديتك اتوافَق عليها ❤️</h1>
-        <p>بقت جاهزة للنشر والمشاركة. ابعت الرابط للشخص اللي عملتله الهدية.</p>
-        <div className="approved-share-link" dir="ltr">{approvedUrl}</div>
-        <button className="btn btn-primary approved-share-button" onClick={shareApprovedGift}><Share2 size={18}/> مشاركة الهدية</button>
-        <button className="btn btn-outline approved-open-button" onClick={() => window.location.assign(approvedUrl)}><Eye size={17}/> معاينة الهدية</button>
-        {shareNotice && <p className="approved-share-notice" role="status">{shareNotice}</p>}
-      </> : status === "rejected" ? <>
-        <h1>الطلب مرفوض</h1>
-        <p>لم يتم اعتماد التحويل. راجع رقم العملية أو تواصل مع إدارة الموقع قبل إرسال طلب جديد.</p>
-      </> : <>
-        <h1>طلبك وصل للمراجعة</h1>
-        <p>طلب إنشاء الهدية اتسجل، وهيتم مراجعته يدويًا. الهدية مش هتتنشر قبل الموافقة.</p>
-        <div className="payment-wait-status"><span className="payment-pulse"></span> في انتظار مراجعة الدفع</div>
-        {pendingPayment?.orderId && <p>رقم الطلب: <b dir="ltr">{pendingPayment.orderId}</b></p>}
-        {pendingPayment?.walletNumber && <p>محفظة الاستقبال: <b dir="ltr">{pendingPayment.walletNumber}</b></p>}
-      </>}
-      {status !== "approved" && <button className="btn btn-outline" onClick={goHome}>العودة للرئيسية</button>}
     </div>
   </main>;
 }
