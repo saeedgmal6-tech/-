@@ -204,10 +204,6 @@ function App() {
       setToast("كلمة مرور الهدية لازم تكون 4 أحرف على الأقل.");
       return;
     }
-    if (!supabase) {
-      setToast("خدمة حفظ الهدايا غير متاحة حاليًا. حاول مرة أخرى بعد قليل.");
-      return;
-    }
     setSaving(true);
     const privatePayload = { message: form.message.trim(), photos: form.photos.map(p => p.data), cover: form.cover || form.photos[0]?.data || "", audio_url: form.audioUrl || "", audio_name: form.audioName || "", video_url: form.videoUrl || "", timeline: Array.isArray(form.timeline) ? form.timeline.slice(0, 6) : [] };
     let securePayload = null;
@@ -233,6 +229,7 @@ function App() {
           timeline: form.password ? [] : (Array.isArray(form.timeline) ? form.timeline.slice(0, 6) : []),
           custom_accent: form.customAccent || "",
           font_family: form.fontFamily || "Cairo",
+          theme: form.theme,
           locked: !!form.password,
           secure_payload: securePayload,
         } }
@@ -241,9 +238,16 @@ function App() {
       music: !!form.music
     };
     try {
-      const { data, error } = await supabase.from("gifts").insert(record).select("*").single();
-      if (error) throw error;
-      const publishedGift = decodeGiftRecord(data);
+      const response = await fetch("/api/gifts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(record)
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.gift) {
+        throw new Error(result.error || "تعذر حفظ الهدية. حاول مرة أخرى.");
+      }
+      const publishedGift = decodeGiftRecord(result.gift);
       setGifts(prev => [publishedGift, ...prev.filter(item => item.slug !== publishedGift.slug)]);
       setActiveGift(publishedGift);
       setSaving(false);
