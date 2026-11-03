@@ -72,11 +72,10 @@ function fmtDate(value) {
   try { return new Date(value + "T12:00:00").toLocaleDateString("ar-EG", {year:"numeric",month:"long",day:"numeric"}); } catch { return value; }
 }
 function App() {
-  const [page, setPage] = useState(() => window.location.pathname === "/admin" ? "admin" : window.location.pathname === "/payment-return" ? "payment-return" : "home");
+  const [page, setPage] = useState(() => window.location.pathname === "/admin" ? "admin" : "home");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [gifts, setGifts] = useState(readLocal);
   const [activeGift, setActiveGift] = useState(null);
-  const [pendingPayment, setPendingPayment] = useState(null);
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -117,50 +116,7 @@ function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  useEffect(() => {
-    if (page !== "payment-return") return;
-    const slugFromUrl = new URLSearchParams(window.location.search).get("slug") || "";
-    if (!slugFromUrl) {
-      setToast("رابط متابعة الدفع غير صحيح.");
-      setPage("home");
-      return;
-    }
-    let stopped = false;
-    let attempts = 0;
-    const checkStatus = async () => {
-      attempts += 1;
-      try {
-        const response = await fetch(`/api/payments/status?slug=${encodeURIComponent(slugFromUrl)}`, { cache: "no-store" });
-        const result = await response.json();
-        if (stopped) return;
-        if (response.ok && result.status === "paid" && result.gift) {
-          stopped = true;
-          const publishedGift = decodeGiftRecord(result.gift);
-          setActiveGift(publishedGift);
-          setGifts(prev => [publishedGift, ...prev.filter(g => g.slug !== publishedGift.slug)]);
-          window.history.replaceState({}, "", `/g/${result.gift.slug}`);
-          setPage("success");
-          return;
-        }
-        if (result.status === "failed" || result.status === "not_found") {
-          stopped = true;
-          setToast("الدفع لم يتأكد. لو المبلغ اتخصم، تواصل مع الدعم قبل إعادة الدفع.");
-          setPage("home");
-          window.history.replaceState({}, "", "/");
-          return;
-        }
-      } catch {}
-      if (attempts >= 40 && !stopped) {
-        stopped = true;
-        setToast("الدفع لسه قيد التأكيد. افتح هداياي بعد لحظات أو تواصل مع الدعم لو المبلغ اتخصم.");
-        setPage("home");
-        window.history.replaceState({}, "", "/");
-      }
-    };
-    checkStatus();
-    const timer = setInterval(checkStatus, 2500);
-    return () => { stopped = true; clearInterval(timer); };
-  }, [page]);
+
 
   async function loadGift(id) {
     fetch("/api/track?mode=events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "gift_view", slug: id }) }).catch(() => {});
@@ -244,15 +200,14 @@ function App() {
       setToast("اكتب اسم المُهدى إليه واسمك والرسالة الأول.");
       return;
     }
-    if (!/^(?:\+?20)?0?1[0125][0-9]{8}$/.test(String(form.payerPhone || "").replace(/[\s()-]/g, ""))) {
-      setToast("اكتب رقم موبايل مصري صحيح علشان نراجع التحويل.");
+    if (form.password && form.password.length < 4) {
+      setToast("كلمة مرور الهدية لازم تكون 4 أحرف على الأقل.");
       return;
     }
-    if (String(form.transferReference || "").trim().length < 4) {
-      setToast("اكتب رقم العملية الظاهر في رسالة تحويل أورنج كاش.");
+    if (!supabase) {
+      setToast("خدمة حفظ الهدايا غير متاحة حاليًا. حاول مرة أخرى بعد قليل.");
       return;
     }
-    if (form.password && form.password.length < 4) { setToast("كلمة مرور الهدية لازم تكون 4 أحرف على الأقل."); return; }
     setSaving(true);
     const ownerToken = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("");
     const privatePayload = { message: form.message.trim(), photos: form.photos.map(p => p.data), cover: form.cover || form.photos[0]?.data || "", audio_url: form.audioUrl || "", audio_name: form.audioName || "", video_url: form.videoUrl || "", timeline: Array.isArray(form.timeline) ? form.timeline.slice(0, 6) : [] };
@@ -261,53 +216,52 @@ function App() {
     catch { setSaving(false); setToast("تعذر تشفير محتوى الهدية على هذا المتصفح."); return; }
     const record = {
       slug: slug(),
-      title: form.title.trim() || `هدية إلى ${form.toName}`,
+      title: form.title.trim() || "هدية إلى " + form.toName,
       from_name: form.fromName.trim(),
       to_name: form.toName.trim(),
       message: form.password ? "الهدية دي محمية بكلمة مرور ❤️" : form.message.trim(),
       date: form.date || null,
       occasion: form.occasion,
       theme: form.theme,
-      photos: form.password ? [] : form.photos.map(p => p.data),
+      photos: [
+        ...(form.password ? [] : form.photos.map(p => p.data)),
+        { __lahzetna_meta: {
+          audio_url: form.password ? "" : (form.audioUrl || ""),
+          audio_name: form.password ? "" : (form.audioName || ""),
+          video_url: form.password ? "" : (form.videoUrl || ""),
+          expires_at: form.expiresAt || null,
+          open_at: form.openAt ? new Date(form.openAt).toISOString() : null,
+          timeline: form.password ? [] : (Array.isArray(form.timeline) ? form.timeline.slice(0, 6) : []),
+          custom_accent: form.customAccent || "",
+          font_family: form.fontFamily || "Cairo",
+          locked: !!form.password,
+          secure_payload: securePayload,
+          owner_token: ownerToken
+        } }
+      ],
       cover: form.password ? "" : (form.cover || form.photos[0]?.data || ""),
-      music: !!form.music,
-      audio_url: form.password ? "" : (form.audioUrl || ""),
-      audio_name: form.password ? "" : (form.audioName || ""),
-      video_url: form.password ? "" : (form.videoUrl || ""),
-      expires_at: form.expiresAt || null,
-      open_at: form.openAt ? new Date(form.openAt).toISOString() : null,
-      timeline: form.password ? [] : (Array.isArray(form.timeline) ? form.timeline.slice(0, 6) : []),
-      custom_accent: form.customAccent || "",
-      font_family: form.fontFamily || "Cairo",
-      locked: !!form.password,
-      secure_payload: securePayload,
-      owner_token: ownerToken
+      music: !!form.music
     };
     try {
-      const owners = JSON.parse(localStorage.getItem("lahzetna_owner_tokens") || "{}");
-      owners[record.slug] = ownerToken;
-      localStorage.setItem("lahzetna_owner_tokens", JSON.stringify(owners));
-    } catch {}
-    fetch("/api/track?mode=events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "payment_submitted" }) }).catch(() => {});
-    try {
-      const response = await fetch("/api/payments/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gift: record, phone: form.payerPhone, reference: form.transferReference })
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result.orderId) {
-        setSaving(false);
-        setToast(result.error || "تعذر تسجيل طلب الدفع. حاول مرة أخرى.");
-        return;
-      }
-      setGifts(prev => [{ ...record, owner_token: undefined, payment_status: "awaiting_review", created_at: new Date().toISOString() }, ...prev.filter(item => item.slug !== record.slug)]);
-      setPendingPayment(result);
+      const { data, error } = await supabase.from("gifts").insert(record).select("*").single();
+      if (error) throw error;
+      try {
+        const owners = JSON.parse(localStorage.getItem("lahzetna_owner_tokens") || "{}");
+        owners[record.slug] = ownerToken;
+        localStorage.setItem("lahzetna_owner_tokens", JSON.stringify(owners));
+      } catch {}
+      const publishedGift = decodeGiftRecord(data);
+      setGifts(prev => [publishedGift, ...prev.filter(item => item.slug !== publishedGift.slug)]);
+      setActiveGift(publishedGift);
       setSaving(false);
-      setPage("manual-payment");
-    } catch {
+      setPage("success");
+      window.history.pushState({}, "", "/g/" + publishedGift.slug);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setToast("تم إنشاء هديتك بنجاح ❤️");
+    } catch (error) {
+      console.error("Gift creation failed:", error);
       setSaving(false);
-      setToast("تعذر الاتصال ببوابة الدفع. تحقق من الإنترنت وحاول مرة أخرى.");
+      setToast(error?.message || "تعذر حفظ الهدية. حاول مرة أخرى.");
     }
   }
 
@@ -405,8 +359,6 @@ function App() {
       {page === "create" && <CreatePage form={form} setField={setField} themes={themes} theme={theme} handlePhoto={handlePhoto} handleMediaUpload={handleMediaUpload} createGift={createGift} saving={saving} />}
       {page === "success" && <Success gift={activeGift} shareUrl={shareUrl} copyLink={copyLink} whatsappShare={whatsappShare} startCreate={startCreate} openGift={() => openGift(activeGift)} />}
       {page === "view" && <GiftView gift={activeGift} theme={giftTheme} loading={giftLoading} goHome={goHome} startCreate={startCreate} />}
-      {page === "payment-return" && <PaymentReturn goHome={goHome} />}
-      {page === "manual-payment" && <ManualPaymentPage pendingPayment={pendingPayment} goHome={goHome} />}
       {page === "mygifts" && <MyGifts gifts={gifts} openGift={openGift} startCreate={startCreate} setGifts={setGifts} setToast={setToast} copyGiftForEditing={copyGiftForEditing} />}
       <footer className="footer">
         <div className="footer-inner">
@@ -543,9 +495,6 @@ function CreatePage({ form, setField, themes, theme, handlePhoto, handleMediaUpl
           <div className="form-section-title"><span className="form-icon"><Heart size={19}/></span><div><h2>الحكاية بتبدأ بمين؟</h2><p>خلينا نعرف الهدية لمين ومن مين.</p></div></div>
           <label>عنوان الهدية<input value={form.title} onChange={e=>setField("title",e.target.value)} placeholder="مثلاً: حكايتنا لسه مكملة" maxLength={90}/></label>
           <div className="field-grid"><label>اسمك<input value={form.fromName} onChange={e=>setField("fromName",e.target.value)} placeholder="اسمك" required maxLength={60}/></label><label>اسم الشخص<input value={form.toName} onChange={e=>setField("toName",e.target.value)} placeholder="اسم حبيبك" required maxLength={60}/></label></div>
-          <div className="payment-price-note"><span>سعر إنشاء الهدية</span><strong>20 جنيه مصري</strong><small>حوّل المبلغ إلى رقم أورنج كاش الموضح أدناه أولًا، ثم اكتب بيانات التحويل. لن تُنشر الهدية إلا بعد مراجعة الدفع والموافقة عليه.</small><WalletNumber /></div>
-          <label>رقم الموبايل اللي حوّلت منه<input type="tel" inputMode="tel" autoComplete="tel" value={form.payerPhone || ""} onChange={e=>setField("payerPhone",e.target.value)} placeholder="01xxxxxxxxx" required maxLength={15}/><span className="optional">رقم المحفظة التي أرسلت منها مبلغ الـ20 جنيه.</span></label>
-          <label>رقم العملية / مرجع التحويل<input type="text" value={form.transferReference || ""} onChange={e=>setField("transferReference",e.target.value)} placeholder="اكتب رقم العملية من رسالة أورنج كاش" required maxLength={100}/><span className="optional">اكتب رقم العملية كما ظهر في رسالة تأكيد التحويل.</span></label>
           <label>المناسبة<select value={form.occasion} onChange={e=>setField("occasion",e.target.value)}>{occasions.map(o=><option key={o}>{o}</option>)}</select></label>
           <label>التاريخ المميز <span className="optional">(اختياري)</span><div className="input-icon"><CalendarDays size={18}/><input type="date" value={form.date} onChange={e=>setField("date",e.target.value)}/></div></label>
         </div>
@@ -1084,24 +1033,12 @@ function AdminPage() {
           <article className="admin-stat"><span className="admin-stat-icon"><Clock3 size={19}/></span><small>زيارات آخر 7 أيام</small><strong>{(dashboard.stats?.visits7d || 0).toLocaleString("ar-EG")}</strong></article>
           <article className="admin-stat"><span className="admin-stat-icon"><Gift size={19}/></span><small>إجمالي الهدايا</small><strong>{(dashboard.stats?.totalGifts || 0).toLocaleString("ar-EG")}</strong></article>
           <article className="admin-stat"><span className="admin-stat-icon"><MessageCircle size={19}/></span><small>رسائل محفوظة</small><strong>{(dashboard.stats?.totalGifts || 0).toLocaleString("ar-EG")}</strong></article>
-          <article className="admin-stat"><span className="admin-stat-icon"><Check size={19}/></span><small>طلبات دفع معتمدة</small><strong>{(dashboard.stats?.approvedOrders || 0).toLocaleString("ar-EG")}</strong></article>
-          <article className="admin-stat"><span className="admin-stat-icon"><Gift size={19}/></span><small>إجمالي المدفوعات المؤكدة</small><strong>{(Number(dashboard.stats?.totalRevenueCents || 0) / 100).toLocaleString("ar-EG")} ج.م</strong></article>
           <article className="admin-stat"><span className="admin-stat-icon"><WandSparkles size={19}/></span><small>بدأوا إنشاء هدية · 30 يوم</small><strong>{(dashboard.funnel?.giftStarts || 0).toLocaleString("ar-EG")}</strong></article>
-          <article className="admin-stat"><span className="admin-stat-icon"><Upload size={19}/></span><small>طلبات دفع أُرسلت · 30 يوم</small><strong>{(dashboard.funnel?.paymentSubmissions || 0).toLocaleString("ar-EG")}</strong></article>
           <article className="admin-stat"><span className="admin-stat-icon"><Eye size={19}/></span><small>فتح هدايا · 30 يوم</small><strong>{(dashboard.funnel?.giftViews || 0).toLocaleString("ar-EG")}</strong></article>
           <article className="admin-stat"><span className="admin-stat-icon"><MessageCircle size={19}/></span><small>ردود المستلمين · 30 يوم</small><strong>{(dashboard.funnel?.replies || 0).toLocaleString("ar-EG")}</strong></article>
         </div>
         {reviewNotice && <div className="admin-review-notice">{reviewNotice}</div>}
-        <section className="admin-panel admin-payment-panel">
-          <div className="admin-panel-heading"><div><h2>طلبات الدفع المعلقة ({dashboard.pendingOrders?.length || 0})</h2><p>كل طلب هنا ينتظر مراجعتك. قبول الطلب ينشر الهدية، والرفض يمنع نشرها.</p></div></div>
-          {!dashboard.pendingOrders?.length ? <div className="admin-empty">لا توجد طلبات دفع جديدة للمراجعة.</div> :
-            <div className="admin-payment-list">{dashboard.pendingOrders.map(order => <article className="admin-payment-order" key={order.id}>
-              <div className="admin-message-top"><div><strong>{order.gift?.title || "هدية من لحظتنا"}</strong><small>من {order.gift?.from_name || "—"} إلى {order.gift?.to_name || "—"}</small></div><time>{dateText(order.created_at)}</time></div>
-              <div className="admin-gift-details"><span>المبلغ: {(Number(order.amount_cents || 2000) / 100).toLocaleString("ar-EG")} جنيه</span><span>رقم المحوّل: <b dir="ltr">{order.payer_phone || "—"}</b></span><span>رقم العملية: <b dir="ltr">{order.payment_reference || "—"}</b></span><span>رقم الطلب: <b dir="ltr">{String(order.id).slice(0,8)}</b></span></div>
-              <p className="admin-payment-message">{order.gift?.message || ""}</p>
-              <div className="admin-payment-actions"><button className="admin-btn admin-approve" disabled={!!reviewingOrderId} onClick={() => reviewPayment(order,"approve")}>{reviewingOrderId === order.id ? "جارٍ الحفظ..." : "قبول ونشر الهدية"} <Check size={16}/></button><button className="admin-btn admin-reject" disabled={!!reviewingOrderId} onClick={() => reviewPayment(order,"reject")}>رفض الطلب <X size={16}/></button></div>
-            </article>)}</div>}
-        </section>
+
         <div className="admin-tabs"><button className={tab==="messages"?"active":""} onClick={()=>setTab("messages")}><MessageCircle size={16}/> الرسائل والهدايا ({dashboard.gifts?.length || 0})</button><button className={tab==="visits"?"active":""} onClick={()=>setTab("visits")}><Eye size={16}/> سجل الزيارات</button></div>
         {tab === "messages" ? <div className="admin-panel">
           <div className="admin-panel-heading"><div><h2>كل الهدايا التي أنشأها المستخدمون</h2><p>إجمالي {((dashboard.gifts || []).length).toLocaleString("ar-EG")} هدية محفوظة في قاعدة البيانات، مرتبة من الأحدث للأقدم.</p></div></div>
