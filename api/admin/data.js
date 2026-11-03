@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
+import { list } from "@vercel/blob";
 
 function authorized(req) {
   const cookie = String(req.headers.cookie || "").split(";").map(x => x.trim()).find(x => x.startsWith("lahzetna_admin="));
@@ -24,58 +24,20 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
   if (!authorized(req)) return res.status(401).json({ error: "سجّل الدخول من جديد." });
 
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return res.status(503).json({ error: "باقي إعداد واحد: أضف SUPABASE_SERVICE_ROLE_KEY في Vercel Environment Variables، باستخدام المفتاح السري من Supabase. لا تضعه في الواجهة الأمامية." });
-
-  const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const [visitCountResult, visits7Result, visitsResult] = await Promise.all([
-    db.from("site_visits").select("*", { count: "exact", head: true }),
-    db.from("site_visits").select("*", { count: "exact", head: true }).gte("created_at", since),
-    db.from("site_visits").select("id,path,referrer,created_at").order("created_at", { ascending: false }).limit(300),
-  ]);
-
-  const eventsSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const [eventsResult, repliesResult] = await Promise.all([
-    db.from("site_events").select("event,created_at").gte("created_at", eventsSince),
-    db.from("gift_replies").select("id,slug,reaction,message,created_at").order("created_at", { ascending: false }).limit(100)
-  ]);
-
-  // Read gifts in pages so the admin dashboard isn't silently capped at the newest 300.
-  const allGifts = [];
-  let giftsError = null;
-  const pageSize = 500;
-  for (let from = 0; ; from += pageSize) {
-    const result = await db.from("gifts").select("*").order("created_at", { ascending: false }).range(from, from + pageSize - 1);
-    if (result.error) { giftsError = result.error; break; }
-    const batch = result.data || [];
-    allGifts.push(...batch);
-    if (batch.length < pageSize) break;
+  try {
+    const result = await list({ prefix: "gifts/", limit: 1000 });
+    const gifts = await Promise.all(result.blobs.map(async blob => {
+      const response = await fetch(blob.url);
+      return response.ok ? response.json() : null;
+    }));
+    const cleanGifts = gifts.filter(Boolean);
+    return res.status(200).json({
+      stats: { totalVisits: 0, visits7d: 0, totalGifts: cleanGifts.length },
+      funnel: { giftStarts: 0, paymentSubmissions: 0, giftViews: 0, replies: 0 },
+      replies: [], gifts: cleanGifts, visits: [], topPaths: []
+    });
+  } catch (error) {
+    console.error("Admin Blob read failed:", error?.message || error);
+    return res.status(503).json({ error: "تعذر تحميل بيانات لوحة الإدارة حاليًا." });
   }
-
-  const firstError = giftsError || visitCountResult.error || visits7Result.error || visitsResult.error;
-  if (firstError) {
-    const missingVisits = String(firstError.message || "").toLowerCase().includes("site_visits");
-    return res.status(503).json({ error: missingVisits ? "جدول الزيارات لسه مش متجهز. شغّل ملف supabase/admin-analytics.sql في SQL Editor ثم حدّث الصفحة." : "تعذر قراءة بيانات Supabase: " + firstError.message });
-  }
-  const visits = visitsResult.data || [];
-  const funnel = { giftStarts: 0, paymentSubmissions: 0, giftViews: 0, replies: 0 };
-  for (const event of eventsResult.data || []) {
-    if (event.event === "gift_start") funnel.giftStarts++;
-    if (event.event === "payment_submitted") funnel.paymentSubmissions++;
-    if (event.event === "gift_view") funnel.giftViews++;
-    if (event.event === "reply_submitted") funnel.replies++;
-  }
-  const counts = new Map();
-  for (const visit of visits) counts.set(visit.path, (counts.get(visit.path) || 0) + 1);
-  const topPaths = [...counts.entries()].map(([path, count]) => ({ path, count })).sort((a, b) => b.count - a.count).slice(0, 8);
-  return res.status(200).json({
-    stats: { totalVisits: visitCountResult.count || 0, visits7d: visits7Result.count || 0, totalGifts: allGifts.length },
-    funnel,
-    replies: repliesResult.data || [],
-    gifts: allGifts,
-    visits,
-    topPaths
-  });
 }
