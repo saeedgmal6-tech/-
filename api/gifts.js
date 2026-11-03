@@ -19,7 +19,7 @@ const teaser = gift => ({
 
 function getDatabase() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  const key = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
@@ -28,6 +28,23 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   const db = getDatabase();
   if (!db) return res.status(503).json({ error: "إعدادات قاعدة البيانات ناقصة على الخادم. راجع VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY في Vercel." });
+
+  if (req.method === "GET" && req.query?.health === "1") {
+    const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    try {
+      const response = await fetch(url.replace(/\\/$/, "") + "/auth/v1/health", {
+        headers: { apikey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY }
+      });
+      return res.status(200).json({ databaseReachable: true, authStatus: response.status });
+    } catch (error) {
+      console.error("Supabase connectivity diagnostic:", error?.cause?.code || "", error?.cause?.message || error?.message || "");
+      return res.status(503).json({
+        databaseReachable: false,
+        errorCode: error?.cause?.code || "FETCH_FAILED",
+        error: "الخادم غير قادر على الوصول إلى مشروع Supabase. راجع حالة المشروع وإعدادات عنوانه."
+      });
+    }
+  }
 
   if (req.method === "POST") {
     const body = req.body || {};
