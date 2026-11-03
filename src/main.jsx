@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { createClient } from "@supabase/supabase-js";
 import {
   ArrowLeft, ArrowUpLeft, Heart, Sparkles, Gift, Camera, CalendarDays,
   Link2, MessageCircle, ChevronLeft, ChevronRight, Check, Copy, Eye,
@@ -9,9 +8,6 @@ import {
 } from "lucide-react";
 import "./styles.css";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const themes = [
   { id: "rose", name: "وردي رومانسي", emoji: "🌷", bg: "linear-gradient(145deg,#fff0f2,#ffe2e8)", accent: "#b83f65" },
@@ -178,15 +174,16 @@ function App() {
     const maxSize = isAudio ? 25 * 1024 * 1024 : 35 * 1024 * 1024;
     if (!allowed) { setToast(isAudio ? "اختار ملف صوتي MP3 أو M4A أو WAV أو OGG." : "اختار ملف فيديو صالح."); return; }
     if (file.size > maxSize) { setToast(`حجم الملف أكبر من الحد المسموح (${isAudio ? "25" : "35"} ميجابايت).`); return; }
-    if (!supabase) { setToast("رفع الملفات يحتاج اتصال قاعدة بيانات Supabase. جرّب تحديث الصفحة."); return; }
     setSaving(true);
     try {
-      const signResponse = await fetch("/api/media/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size, mediaType: isAudio ? "audio" : "video" }) });
-      const signed = await signResponse.json().catch(() => ({}));
-      if (!signResponse.ok || !signed.path || !signed.token) throw new Error(signed.error || "تعذر تجهيز رفع الملف.");
-      const { error } = await supabase.storage.from("lahzetna-media").uploadToSignedUrl(signed.path, signed.token, file, { contentType: file.type, upsert: true });
-      if (error) throw error;
-      setField(field, signed.publicUrl);
+      const { upload } = await import("@vercel/blob/client");
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/media/upload",
+        contentType: file.type,
+        clientPayload: JSON.stringify({ mediaType: isAudio ? "audio" : "video" })
+      });
+      setField(field, blob.url);
       if (isAudio) setField("audioName", file.name);
       setToast(isAudio ? "تم رفع الصوت بنجاح" : "تم رفع الفيديو بنجاح");
     } catch (error) {
