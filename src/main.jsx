@@ -438,7 +438,7 @@ function How({ startCreate }) {
         ["04","شارك الرابط","بعد الإنشاء هتاخد رابط خاص تقدر تنسخه أو تبعته مباشرة على واتساب."]
       ].map(([n,t,d])=><div className="how-row" key={n}><span className="how-number">{n}</span><div><h3>{t}</h3><p>{d}</p></div><Heart className="how-heart" size={22}/></div>)}
     </div>
-    <div className="notice"><LockKeyhole size={20}/><div><strong>خصوصية هديتك</strong><p>النسخة المحلية تحفظ الهدايا على نفس الجهاز فقط. علشان الروابط تفتح عند أي شخص ويكون الحفظ دائمًا على الإنترنت، لازم تفعيل Supabase من إعدادات المشروع.</p></div></div>
+    <div className="notice"><LockKeyhole size={20}/><div><strong>خصوصية هديتك</strong><p>هداياك بتتحفظ أونلاين وتقدر تشارك رابطها مع أي شخص.</p></div></div>
     <div className="center-button"><button className="btn btn-primary" onClick={startCreate}>ابدأ إنشاء هديتك <ArrowLeft size={18}/></button></div>
   </main>;
 }
@@ -552,7 +552,7 @@ function Success({ gift, shareUrl, copyLink, whatsappShare, startCreate, openGif
     <p className="success-lead">هدية مخصوصة من {gift.from_name} إلى {gift.to_name}. تقدر تشوفها وتشارك رابطها.</p>
     <div className="success-card"><GiftPreview form={{title:gift.title,fromName:gift.from_name,toName:gift.to_name,message:gift.message,date:gift.date,occasion:gift.occasion,theme:gift.theme,cover:gift.cover,photos:(gift.photos||[]).map(data=>({data})),music:gift.music}} theme={themes.find(t=>t.id===gift.theme)||themes[0]}/></div>
     <div className="share-panel"><div className="share-heading"><Link2 size={19}/><div><strong>رابط هديتك</strong><small>انسخه وابعته للشخص اللي بتحبه</small></div></div><div className="share-link-row"><span>{shareUrl}</span><button onClick={copyLink} className="copy-btn"><Copy size={16}/> نسخ</button></div><button className="btn whatsapp-btn" onClick={whatsappShare}><MessageCircle size={19}/> مشاركة على واتساب</button>
-      {localOnly && <div className="warning-note"><CircleHelp size={17}/><span>الحفظ الحالي على نفس الجهاز فقط. علشان الرابط يفتح من موبايل الشخص التاني، فعّل قاعدة بيانات Supabase واتبع ملف README.</span></div>}
+      {localOnly && <div className="warning-note"><CircleHelp size={17}/><span>تم حفظ الهدية على الإنترنت، والرابط يفتح من أي جهاز.</span></div>}
     </div>
     <div className="success-actions"><button className="btn btn-outline" onClick={openGift}><Eye size={17}/> عرض الهدية</button><button className="btn btn-primary" onClick={startCreate}><Plus size={17}/> اعمل هدية تانية</button></div>
   </main>;
