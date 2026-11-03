@@ -209,7 +209,6 @@ function App() {
       return;
     }
     setSaving(true);
-    const ownerToken = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("");
     const privatePayload = { message: form.message.trim(), photos: form.photos.map(p => p.data), cover: form.cover || form.photos[0]?.data || "", audio_url: form.audioUrl || "", audio_name: form.audioName || "", video_url: form.videoUrl || "", timeline: Array.isArray(form.timeline) ? form.timeline.slice(0, 6) : [] };
     let securePayload = null;
     try { if (form.password) securePayload = await encryptGiftPayload(privatePayload, form.password); }
@@ -236,7 +235,6 @@ function App() {
           font_family: form.fontFamily || "Cairo",
           locked: !!form.password,
           secure_payload: securePayload,
-          owner_token: ownerToken
         } }
       ],
       cover: form.password ? "" : (form.cover || form.photos[0]?.data || ""),
@@ -245,11 +243,6 @@ function App() {
     try {
       const { data, error } = await supabase.from("gifts").insert(record).select("*").single();
       if (error) throw error;
-      try {
-        const owners = JSON.parse(localStorage.getItem("lahzetna_owner_tokens") || "{}");
-        owners[record.slug] = ownerToken;
-        localStorage.setItem("lahzetna_owner_tokens", JSON.stringify(owners));
-      } catch {}
       const publishedGift = decodeGiftRecord(data);
       setGifts(prev => [publishedGift, ...prev.filter(item => item.slug !== publishedGift.slug)]);
       setActiveGift(publishedGift);
