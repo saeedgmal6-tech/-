@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { list } from "@vercel/blob";
 
 const esc = value => String(value || "").replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
 const meta = (html, selector, value) => {
@@ -17,26 +17,27 @@ export default async function handler(req, res) {
   let title = "هدية من القلب | لحظتنا";
   let description = "فيه حكاية خاصة مستنياك على لحظتنا ❤️";
   let imageUrl = "https://lahzetna.vercel.app/icon.svg";
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (url && key) {
-    try {
-      const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-      const { data } = await db.from("gifts").select("title,from_name,to_name,message,cover,photos").eq("slug", slug).maybeSingle();
-      if (data) {
+  try {
+    const matches = await list({ prefix: `gifts/${slug}.json`, limit: 1 });
+    const blob = matches.blobs.find(item => item.pathname === `gifts/${slug}.json`);
+    if (blob) {
+      const response = await fetch(blob.url);
+      if (response.ok) {
+        const data = await response.json();
         const photos = Array.isArray(data.photos) ? data.photos : [];
         const metaItem = photos.find(item => item && typeof item === "object" && item.__lahzetna_meta);
-        const meta = metaItem?.__lahzetna_meta || {};
-        const expired = meta.expires_at && new Date(meta.expires_at + "T23:59:59").getTime() < Date.now();
-        const scheduled = meta.open_at && Date.parse(meta.open_at) > Date.now();
+        const giftMeta = metaItem?.__lahzetna_meta || {};
+        const expired = giftMeta.expires_at && new Date(giftMeta.expires_at + "T23:59:59").getTime() < Date.now();
+        const scheduled = giftMeta.open_at && Date.parse(giftMeta.open_at) > Date.now();
         if (!expired && !scheduled) {
           title = data.title || ("هدية إلى " + (data.to_name || "شخص مميز"));
           description = "هدية مخصوصة من " + (data.from_name || "شخص بيحبك") + " إلى " + (data.to_name || "شخص مميز") + " ❤️";
           if (typeof data.cover === "string" && data.cover.startsWith("https://")) imageUrl = data.cover;
         }
       }
-    } catch (error) { console.error("Gift preview metadata lookup failed:", error?.message || error); }
-  }
+    }
+  } catch (error) { console.error("Gift preview metadata lookup failed:", error?.message || error); }
+
   let html;
   try {
     const response = await fetch("https://lahzetna.vercel.app/index.html", { cache: "no-store" });
